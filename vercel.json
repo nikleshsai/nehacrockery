@@ -2,11 +2,27 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://neha-crockery-backend.onrender.com/api/:path*"
+      "destination": "https://nehacrockery.onrender.com/api/:path*"
     },
     {
       "source": "/uploads/:path*",
-      "destination": "https://neha-crockery-backend.onrender.com/uploads/:path*"
+      "destination": "https://nehacrockery.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/admin/:path*"
+    },
+    {
+      "source": "/",
+      "destination": "/frontend/index.html"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/frontend/:path*"
     }
   ]
 }
