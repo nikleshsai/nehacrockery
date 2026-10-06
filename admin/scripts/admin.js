@@ -16,7 +16,7 @@
   var TOKEN_KEY = 'nch_admin_token';
   // Supabase config — anon key is safe to expose in frontend
   var SUPABASE_URL = 'https://rptvadjhblznngaoaaxn.supabase.co';
-  var SUPABASE_ANON_KEY = '';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwdHZhZGpoYmx6bm5nYW9hYXhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0OTg1MzIsImV4cCI6MjEwNjA3NDUzMn0.b-zhfMxeiNQCjnbLF2e8YBMfh_71ztrq1YoQdagoxrI';
 
   /* ── STATE ─────────────────────────────────────────────────────────────── */
   var state = {
