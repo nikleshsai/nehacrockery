@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Authentication & Authorization middleware
-// Supports: own JWT (legacy) + Supabase JWT (new)
+// Supports: own JWT (HS256) + Supabase JWT (ES256, verified via Supabase SDK)
 // ─────────────────────────────────────────────────────────────────────────────
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
@@ -8,13 +8,14 @@ import { UserRole } from '@prisma/client';
 import { AppError } from '../utils/AppError';
 import { config } from '../config/env';
 import prisma from '../config/database';
+import { getSupabaseClient } from '../config/supabase';
 
 interface JwtPayload {
   userId?: string;      // Own JWT
   sub?: string;         // Supabase JWT (user UUID)
   email?: string;
   role?: UserRole;
-  iss?: string;         // Supabase JWT: 'https://<project>.supabase.co/auth/v1'
+  iss?: string;         // Supabase JWT issuer
 }
 
 // Augment Express Request type
@@ -32,8 +33,24 @@ declare global {
 }
 
 /**
- * Verifies the JWT from the Authorization header.
- * Accepts both our own JWT and Supabase JWT tokens.
+ * Returns true if the token looks like a Supabase JWT.
+ * Supabase tokens have "iss" containing "supabase" in their payload.
+ * We check this WITHOUT verifying the signature (safe — we verify via SDK next).
+ */
+function looksLikeSupabaseToken(token: string): boolean {
+  try {
+    const decoded = jwt.decode(token) as JwtPayload | null;
+    if (!decoded) return false;
+    // Supabase tokens have iss like "https://<ref>.supabase.co/auth/v1"
+    return !!(decoded.sub && decoded.iss && decoded.iss.includes('supabase'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verifies the JWT from the Authorization header or cookie.
+ * Accepts both our own HS256 JWT and Supabase ES256 JWT tokens.
  * Attaches decoded user to req.user.
  */
 export async function authenticate(
@@ -52,25 +69,29 @@ export async function authenticate(
       throw AppError.unauthorized('Authentication token is required');
     }
 
-    let payload: JwtPayload | null = null;
-    let isSupabaseToken = false;
+    let userEmail: string | undefined;
+    let userId: string | undefined;
 
-    // Try Supabase JWT first (if configured)
-    const supabaseJwtSecret = process.env['SUPABASE_JWT_SECRET'];
-    if (supabaseJwtSecret) {
+    // ── Check if this is a Supabase token ──────────────────────────────────
+    if (looksLikeSupabaseToken(token)) {
+      // Verify via Supabase SDK (handles ES256 automatically)
       try {
-        payload = jwt.verify(token, supabaseJwtSecret) as JwtPayload;
-        isSupabaseToken = !!(payload.sub && !payload.userId);
-      } catch {
-        // Not a Supabase token, try our own JWT below
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase.auth.getUser(token);
+        if (error || !data.user) {
+          throw AppError.unauthorized('Invalid or expired Supabase token');
+        }
+        userEmail = data.user.email;
+      } catch (err) {
+        if (err instanceof AppError) throw err;
+        throw AppError.unauthorized('Invalid or expired token');
       }
-    }
-
-    // Fall back to our own JWT
-    if (!payload || (!isSupabaseToken && !payload.userId)) {
+    } else {
+      // ── Fall back to our own HS256 JWT ────────────────────────────────────
       try {
-        payload = jwt.verify(token, config.jwt.secret) as JwtPayload;
-        isSupabaseToken = false;
+        const payload = jwt.verify(token, config.jwt.secret) as JwtPayload;
+        userId = payload.userId;
+        userEmail = payload.email;
       } catch (err) {
         if (err instanceof jwt.JsonWebTokenError) {
           throw AppError.unauthorized('Invalid or expired token');
@@ -79,19 +100,17 @@ export async function authenticate(
       }
     }
 
+    // ── Look up user in DB ──────────────────────────────────────────────────
     let user: { id: string; email: string; role: UserRole; name: string; isActive: boolean } | null = null;
 
-    if (isSupabaseToken && payload.sub) {
-      // Supabase JWT: look up by email (Supabase stores email in payload)
-      const email = payload.email ?? '';
+    if (userEmail) {
       user = await prisma.user.findFirst({
-        where: { email: { equals: email, mode: 'insensitive' } },
+        where: { email: { equals: userEmail, mode: 'insensitive' } },
         select: { id: true, email: true, role: true, name: true, isActive: true },
       });
-    } else if (payload.userId) {
-      // Own JWT: look up by userId
+    } else if (userId) {
       user = await prisma.user.findUnique({
-        where: { id: payload.userId },
+        where: { id: userId },
         select: { id: true, email: true, role: true, name: true, isActive: true },
       });
     }
