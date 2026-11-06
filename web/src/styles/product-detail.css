@@ -1,0 +1,73 @@
+/* Product detail page + order modal styles (ported from legacy product.html) */
+.product-detail-section{padding:60px 0 80px}
+.product-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+@media(max-width:768px){.product-detail-grid{grid-template-columns:1fr;gap:32px}}
+.product-gallery{position:sticky;top:90px}
+.product-main-img{width:100%;aspect-ratio:1;background:#f8f6f0;border-radius:16px;border:1px solid #e8e4dc;display:flex;align-items:center;justify-content:center;font-size:96px;overflow:hidden}
+.product-main-img img{width:100%;height:100%;object-fit:contain}
+.product-thumb-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.product-thumb{width:72px;height:72px;border-radius:10px;border:2px solid #e8e4dc;cursor:pointer;object-fit:contain;background:#f8f6f0;transition:border-color .2s}
+.product-thumb.active,.product-thumb:hover{border-color:#1a2744}
+.product-brand-badge{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;letter-spacing:.15em;color:#c8a84b;text-transform:uppercase;margin-bottom:10px}
+.product-detail-name{font-family:'Cormorant Garamond',serif;font-size:clamp(28px,4vw,40px);font-weight:500;color:#1a1a1a;line-height:1.25;margin-bottom:6px}
+.product-detail-code{font-family:'Montserrat',sans-serif;font-size:12px;color:#999;letter-spacing:.08em;margin-bottom:20px}
+.product-price-block{display:flex;align-items:baseline;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.product-price-main{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:600;color:#1a2744}
+.product-price-label{font-family:'Montserrat',sans-serif;font-size:12px;color:#999}
+.product-price-note{font-family:'Montserrat',sans-serif;font-size:11px;color:#c8a84b;background:#fdf8ed;border:1px solid #e8d99a;border-radius:4px;padding:4px 10px}
+.product-specs{margin-bottom:28px}
+.product-specs-title{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1a2744;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e8e4dc}
+.spec-row{display:grid;grid-template-columns:140px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid #f0ece4;font-family:'Montserrat',sans-serif;font-size:13px}
+.spec-label{color:#999;font-weight:500}
+.spec-value{color:#2c2c2c}
+.product-features{list-style:none;padding:0;margin:0 0 28px;display:flex;flex-wrap:wrap;gap:8px}
+.product-features li{font-family:'Montserrat',sans-serif;font-size:12px;color:#2c2c2c;background:#f4f1eb;border:1px solid #e8e4dc;border-radius:20px;padding:4px 14px}
+.product-order-cta{background:#1a2744;border-radius:16px;padding:28px;margin-bottom:16px}
+.product-order-cta-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:500;color:white;margin-bottom:6px}
+.product-order-cta-sub{font-family:'Montserrat',sans-serif;font-size:12px;color:#a0aec0;margin-bottom:20px}
+.btn-order-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px 24px;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;border:none;background:#c8a84b;color:#1a1a1a;margin-bottom:10px}
+.btn-order-primary:hover{background:#d4b55a;transform:translateY(-1px)}
+.btn-wa-outline{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px 24px;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;border:1px solid rgba(255,255,255,.2);background:transparent;color:white;text-decoration:none}
+.btn-wa-outline:hover{background:rgba(255,255,255,.08)}
+.order-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:9000;align-items:center;justify-content:center}
+.order-modal-overlay.open{display:flex}
+.order-modal{background:white;border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3);margin:20px;animation:slideUp .3s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.order-modal-header{padding:28px 28px 20px;border-bottom:1px solid #f0ece4;display:flex;align-items:center;justify-content:space-between}
+.order-modal-title{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;color:#1a1a1a}
+.order-modal-close{width:36px;height:36px;border-radius:50%;border:none;background:#f4f1eb;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1}
+.order-modal-body{padding:24px 28px}
+.order-product-preview{display:flex;align-items:center;gap:14px;background:#f8f6f0;border-radius:10px;padding:14px;margin-bottom:24px}
+.order-product-preview-icon{font-size:32px}
+.order-product-name{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:600;color:#1a1a1a}
+.order-product-brand{font-family:'Montserrat',sans-serif;font-size:11px;color:#999}
+.order-modal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+@media(max-width:480px){.order-modal .form-row{grid-template-columns:1fr}}
+.form-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.form-field label{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:.06em}
+.form-field .req{color:#e53e3e}
+.form-field input,.form-field select,.form-field textarea{padding:11px 14px;border:1.5px solid #e8e4dc;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:13px;color:#2c2c2c;background:white;outline:none;width:100%;box-sizing:border-box;transition:border-color .2s}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:#1a2744}
+.form-field textarea{resize:vertical;min-height:80px}
+.order-type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+@media(max-width:420px){.order-type-grid{grid-template-columns:repeat(2,1fr)}}
+.order-type-btn{padding:10px 6px;border:1.5px solid #e8e4dc;border-radius:8px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:500;cursor:pointer;background:white;color:#666;text-align:center;transition:all .15s}
+.order-type-btn.selected{border-color:#1a2744;background:#1a2744;color:white}
+.order-type-btn:hover:not(.selected){border-color:#1a2744;color:#1a2744}
+.order-submit-btn{width:100%;padding:14px;border-radius:10px;border:none;background:#1a2744;color:white;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.order-submit-btn:hover{background:#243560}
+.order-submit-btn:disabled{opacity:.6;cursor:not-allowed}
+.order-success{text-align:center;padding:40px 20px}
+.order-success-icon{font-size:64px;margin-bottom:16px}
+.order-success-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;color:#1a2744;margin-bottom:10px}
+.order-success-sub{font-family:'Montserrat',sans-serif;font-size:13px;color:#666;line-height:1.6}
+.order-error{color:#e53e3e;font-family:'Montserrat',sans-serif;font-size:12px;margin-top:8px;min-height:20px}
+.breadcrumb{font-family:'Montserrat',sans-serif;font-size:12px;color:#999;padding:20px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.breadcrumb a{color:#1a2744;text-decoration:none}
+.breadcrumb a:hover{text-decoration:underline}
+.breadcrumb-sep{color:#ccc}
+.skeleton{background:linear-gradient(90deg,#f0ece4 25%,#e8e4dc 50%,#f0ece4 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton-img{width:100%;aspect-ratio:1;border-radius:16px}
+.related-section{padding:60px 0;background:#f9f7f2}
+.related-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;margin-top:32px}

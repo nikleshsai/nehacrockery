@@ -24,17 +24,12 @@ export const config = {
     directUrl: process.env.DIRECT_URL,
   },
 
+  // Supabase powers Auth (token verification) and Storage.
   supabase: {
-    url: process.env.SUPABASE_URL,
+    url: requireEnv('SUPABASE_URL'),
     anonKey: process.env.SUPABASE_ANON_KEY,
     // NEVER expose service role key to the frontend
-    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  },
-
-  jwt: {
-    secret: requireEnv('JWT_SECRET'),
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
-    cookieExpiresDays: parseInt(process.env.JWT_COOKIE_EXPIRES_DAYS ?? '7', 10),
+    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
   },
 
   cors: {
@@ -46,7 +41,6 @@ export const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '900000', 10),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS ?? '100', 10),
-    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX ?? '10', 10),
   },
 
   upload: {

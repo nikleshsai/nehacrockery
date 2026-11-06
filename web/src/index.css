@@ -1,0 +1,57 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Neha Crockery House — global styles
+   Tailwind v4 (theme tokens + utilities) layered with the legacy brand stylesheet.
+   Layer order: theme < legacy < utilities  → Tailwind utilities always win.
+   Preflight is intentionally omitted: legacy.css already provides the reset.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer theme, legacy, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "./styles/legacy.css" layer(legacy);
+@import "./styles/product-detail.css" layer(legacy);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  --color-navy: #0d2240;
+  --color-navy-mid: #1a3560;
+  --color-cream: #faf7f2;
+  --color-greige: #ede6da;
+  --color-greige-2: #d8cfc4;
+  --color-sand: #c8b89a;
+  --color-gold: #c9a84c;
+  --color-gold-lt: #e4c97a;
+  --color-charcoal: #3a3330;
+  --color-charcoal-lt: #5c5350;
+
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Montserrat", system-ui, sans-serif;
+
+  --shadow-brand-sm: 0 2px 12px rgba(13, 34, 64, 0.07);
+  --shadow-brand-md: 0 8px 32px rgba(13, 34, 64, 0.1);
+  --shadow-brand-lg: 0 20px 60px rgba(13, 34, 64, 0.13);
+}
+
+/* Admin area: neutral workspace background (legacy body uses the marble image) */
+.admin-root {
+  min-height: 100vh;
+  background: #f4f1eb;
+  background-image: none;
+  font-family: var(--font-sans);
+  color: #2b2623;
+}
+.admin-root *,
+.admin-root *::before,
+.admin-root *::after {
+  box-sizing: border-box;
+}
+.admin-root img {
+  width: auto;
+  max-width: 100%;
+}
+.admin-root button,
+.admin-root input,
+.admin-root select,
+.admin-root textarea {
+  font: inherit;
+  color: inherit;
+}

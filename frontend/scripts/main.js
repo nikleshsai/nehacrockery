@@ -309,11 +309,7 @@
     };
   }
   var DATA_BASE = '../data/';
-  var CATEGORY_ICONS = {
-    crockery: 'Ã°Å¸ÂÂ½Ã¯Â¸Â', cutlery: 'Ã°Å¸ÂÂ´', glassware: 'Ã°Å¸Â¥â€š', melamineware: 'Ã°Å¸Â¥Â£',
-    acrylicware: 'Ã°Å¸Â¥Â¤', kitchenware: 'Ã°Å¸ÂÂ³', hotelware: 'Ã°Å¸ÂÂ¨',
-    'wooden-handicrafts': 'Ã°Å¸ÂªÂµ', 'new-arrivals': 'Ã¢Å“Â¨'
-  };
+  var CATEGORY_ICONS = {};
   var CATEGORY_LABELS = {
     crockery: 'Crockery & Dinnerware', cutlery: 'Cutlery',
     glassware: 'Glassware & Bottles', melamineware: 'Melamineware',
@@ -335,20 +331,25 @@
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Fetch helpers Ã¢â€â‚¬Ã¢â€â‚¬ */
   function fetchJSON(path, cb) {
-    // Try localStorage first (admin panel data)
-    var localKey = path.includes('products') ? 'nch_products' : 'nch_brands';
-    var cached = localStorage.getItem(localKey);
-    if (cached) {
-      try {
-        var d = JSON.parse(cached);
-        cb(null, d);
-        return;
-      } catch (e) { /* fall through */ }
+    // Real backend only (Prisma -> Supabase PostgreSQL). No localStorage / static placeholder data.
+    if (path.indexOf('products') !== -1) {
+      apiFetch('/products?pageSize=100&sortBy=name&sortOrder=asc', function (err, d) {
+        if (err || !d || !Array.isArray(d.data)) { cb(err || new Error('bad response'), null); return; }
+        cb(null, { products: d.data.map(mapApiProduct) });
+      });
+      return;
     }
-    fetch(path)
-      .then(function (r) { return r.json(); })
-      .then(function (d) { cb(null, d); })
-      .catch(function (e) { cb(e, null); });
+    apiFetch('/brands', function (err, d) {
+      if (err || !d || !Array.isArray(d.data)) { cb(err || new Error('bad response'), null); return; }
+      cb(null, { brands: d.data.map(function (b) {
+        return {
+          id: b.slug || b.id, name: b.name, tagline: b.isOwnBrand ? 'Our Own Brand' : '',
+          description: b.description || '', logo: b.logo || '',
+          own_brand: !!b.isOwnBrand, active: b.isActive !== false,
+          productCount: (b._count && b._count.products) || 0
+        };
+      }) });
+    });
   }
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Build a product card HTML Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -359,16 +360,10 @@
     var isFeatured = tags.includes('featured');
     var isNew = tags.includes('new_arrival');
     var imageHtml = '';
-    var CICONS = {
-      'crockery': '🍽', 'crockery-dinnerware': '🍽',
-      'cutlery': '🍴', 'glassware': '🥂', 'glassware-bottles': '🥂',
-      'melamineware': '🥣', 'acrylicware': '🥤',
-      'kitchenware': '🍳', 'wooden-handicrafts': '🪵', 'hotelware': '🏨'
-    };
-    if (product.images && product.images.length > 0) {
+        if (product.images && product.images.length > 0) {
       imageHtml = '<img src="' + escHtml(product.images[0]) + '" alt="' + escHtml(product.name) + '" class="product-card-img" loading="lazy" />';
     } else {
-      var catIcon = CICONS[product.category] || '📦';
+      var catIcon = '<svg class="ui-icon ui-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg>';
       imageHtml = '<div class="product-card-img-placeholder" aria-hidden="true">' + catIcon + '</div>';
     }
     var badgesHtml = '';
@@ -389,7 +384,8 @@
         '<span class="product-card-category">' + catLabel + '</span>' +
         (metaInfo.length ? '<span class="product-card-meta">' + escHtml(metaInfo.join(' · ')) + '</span>' : '') +
       '</div>' +
-      '<div class="product-card-footer"><a href="' + href + '" class="product-enquire-btn">Order / Enquire</a></div>' +
+      (product.mrp ? '<div class="product-card-price" style="padding:0 16px 8px;font-weight:600;color:#1a2744;">\u20b9' + Number(product.mrp).toLocaleString('en-IN') + ' <span style="font-weight:400;font-size:11px;color:#888;">MRP</span></div>' : '<div class="product-card-price" style="padding:0 16px 8px;font-size:12px;color:#888;">Price on request</div>') +
+      '<div class="product-card-footer"><button type="button" class="product-enquire-btn" data-cart-add data-slug="' + escHtml(product.slug) + '" data-name="' + escHtml(product.name) + '" data-code="' + escHtml(product.id) + '" data-price="' + (product.mrp || 0) + '" data-img="' + escHtml((product.images && product.images[0]) || '') + '">Add to Cart</button></div>' +
     '</article>';
   }
 
@@ -422,7 +418,7 @@
       if (featuredGrid) {
         var featured = allProducts.filter(function (p) { return (p.tags || []).includes('featured'); }).slice(0, 4);
         if (featured.length === 0) {
-          featuredGrid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px;">Featured products will appear here once added via the admin panel.</p>';
+          featuredGrid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px;">Browse our full range on the <a href="products.html">Products page</a>.</p>';
         } else {
           featuredGrid.innerHTML = featured.map(buildProductCard).join('');
         }
@@ -431,7 +427,7 @@
       if (arrivalsScroll) {
         var newArrivals = allProducts.filter(function (p) { return (p.tags || []).includes('new_arrival'); }).slice(0, 8);
         if (newArrivals.length === 0) {
-          arrivalsScroll.innerHTML = '<p class="products-loading-text" style="padding:40px;">New arrivals will appear here once added.</p>';
+          arrivalsScroll.innerHTML = '<p class="products-loading-text" style="padding:40px;">New arrivals coming soon.</p>';
         } else {
           arrivalsScroll.innerHTML = newArrivals.map(buildProductCard).join('');
         }
@@ -442,7 +438,7 @@
       if (err || !data || !brandsGrid) return;
       allBrands = (data.brands || []).filter(function (b) { return b.active !== false; });
       if (allBrands.length === 0) {
-        brandsGrid.innerHTML = '<p class="brands-note"><p>Brand logos will appear here once added.</p></p>';
+        brandsGrid.innerHTML = '<p class="brands-note">Our brand list is being updated.</p>';
       } else {
         brandsGrid.innerHTML = allBrands.map(buildBrandCard).join('');
       }
@@ -457,7 +453,7 @@
       if (err || !data) return;
       var brands = (data.brands || []).filter(function (b) { return b.active !== false; });
       if (brands.length === 0) {
-        grid.innerHTML = '<div class="brand-placeholder-note"><p>&#9670; Brand logos and names will appear here once added.</p><p>Use the <a href="admin/" class="inline-link">admin panel</a> to add brands.</p></div>';
+        grid.innerHTML = '<div class="brand-placeholder-note"><p>Our brand list is being updated. Please contact us for the brands we stock.</p></div>';
       } else {
         grid.innerHTML = brands.map(buildBrandCard).join('');
       }
@@ -474,7 +470,7 @@
         return p.active !== false && (p.brand || '').toLowerCase() === 'taroba';
       }).slice(0, 8);
       if (tarobaProducts.length === 0) {
-        grid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px 20px;">Taroba products will appear here once added via the admin panel.</p>';
+        grid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px 20px;">Taroba product details are coming soon. Please enquire on WhatsApp for the current range.</p>';
       } else {
         grid.innerHTML = tarobaProducts.map(buildProductCard).join('');
       }
@@ -538,7 +534,7 @@
     function loadProductsFromJson() {
     fetchJSON(DATA_BASE + 'products.json', function (err, data) {
       if (err || !data) {
-        grid.innerHTML = '<div class="products-empty"><div class="products-empty-icon">Ã°Å¸â€œÂ¦</div><p class="products-empty-desc">Could not load products. Please try again later.</p></div>';
+        grid.innerHTML = '<div class="products-empty"><div class="products-empty-icon"><svg class="ui-icon ui-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div><p class="products-empty-desc">Could not load products. Please try again later.</p></div>';
         return;
       }
       allProducts = (data.products || []).filter(function (p) { return p.active !== false; });
@@ -619,8 +615,9 @@
     });
 
     // Sort
-    if (sortOrder === 'name-asc') filteredProducts.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    else if (sortOrder === 'name-desc') filteredProducts.sort(function (a, b) { return (b.name || '').localeCompare(a.name || ''); });
+    if (sortOrder === 'name-asc' || sortOrder === 'name-az') filteredProducts.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    else if (sortOrder === 'name-desc' || sortOrder === 'name-za') filteredProducts.sort(function (a, b) { return (b.name || '').localeCompare(a.name || ''); });
+    else if (sortOrder === 'new') filteredProducts.sort(function (a, b) { return ((b.tags || []).includes('new_arrival') ? 1 : 0) - ((a.tags || []).includes('new_arrival') ? 1 : 0); });
     else if (sortOrder === 'brand') filteredProducts.sort(function (a, b) { return (a.brand || '').localeCompare(b.brand || ''); });
 
     var total = filteredProducts.length;
@@ -630,9 +627,9 @@
 
     if (total === 0) {
       grid.innerHTML = '<div class="products-empty">' +
-        '<div class="products-empty-icon">Ã°Å¸â€Â</div>' +
-        '<h3 class="products-empty-title">No Products Found</h3>' +
-        '<p class="products-empty-desc">Try adjusting your search or filter, or contact us for the full range.</p>' +
+        '<div class="products-empty-icon"><svg class="ui-icon ui-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></div>' +
+        '<h3 class="products-empty-title">' + (activeCategory !== 'all' && !searchTerm ? 'Products coming soon' : 'No Products Found') + '</h3>' +
+        '<p class="products-empty-desc">' + (activeCategory !== 'all' && !searchTerm ? 'We stock this category in our showroom. Enquire for the current range and availability.' : 'Try adjusting your search or filter, or contact us for the full range.') + '</p>' +
         '<a href="https://wa.me/' + WA_NUMBER + '" class="btn-whatsapp" target="_blank" rel="noopener">Ask on WhatsApp &#8594;</a>' +
         '</div>';
       if (loadMoreWrap) loadMoreWrap.style.display = 'none';
@@ -686,7 +683,7 @@
         (category ? 'Category: ' + category + '\n' : '') +
         '\nMessage:\n' + message;
 
-      window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(text), '_blank');
+      submitEnquiry({ name: name, companyName: business, phone: phone, category: category, message: message, source: 'website-contact' }, text);
     });
   }
 
@@ -714,11 +711,41 @@
         (category ? 'Category: ' + category + '\n' : '') +
         '\nMessage:\n' + message;
 
-      window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(text), '_blank');
+      submitEnquiry({ name: name, companyName: business, phone: phone, category: category, message: message, source: 'website-home' }, text);
     });
   }
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Escape HTML Ã¢â€â‚¬Ã¢â€â‚¬ */
+  /* -- Save enquiry to backend, then open WhatsApp with pre-filled text -- */
+  function submitEnquiry(fields, waText) {
+    var waNum = (document.body.dataset.waNumber) || WA_NUMBER;
+    var waWin = window.open('', '_blank');
+    function goWhatsApp() {
+      var url = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(waText);
+      if (waWin) { waWin.location.href = url; } else { window.location.href = url; }
+    }
+    var msg = (fields.category ? '[Category: ' + fields.category + '] ' : '') + fields.message;
+    fetch(API_BASE + '/enquiries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: fields.name.trim(),
+        companyName: fields.companyName ? fields.companyName.trim() : null,
+        phone: fields.phone.trim(),
+        message: msg.slice(0, 2000),
+        source: fields.source
+      })
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        alert('Thank you. Your enquiry has been received. WhatsApp will open so you can reach us instantly.');
+      })
+      .catch(function () {
+        alert('We could not save your enquiry online, but you can still send it on WhatsApp.');
+      })
+      .then(goWhatsApp);
+  }
+
   function escHtml(str) {
     return String(str || '')
       .replace(/&/g, '&amp;')
@@ -758,6 +785,13 @@
     var whatsapp = s.whatsapp || s.phone || '';
     var waNumber = whatsapp.replace(/\D/g, '');
     if (waNumber.length === 10) waNumber = '91' + waNumber;
+    var telNumber = phone.replace(/\D/g, '');
+    if (telNumber.length === 10) telNumber = '91' + telNumber;
+    if (!telNumber) telNumber = waNumber;
+    var phoneDisplay = telNumber.length === 12 ? '+91 ' + telNumber.slice(2, 7) + ' ' + telNumber.slice(7) : phone;
+    var whatsapp = s.whatsapp || s.phone || '';
+    var waNumber = whatsapp.replace(/\D/g, '');
+    if (waNumber.length === 10) waNumber = '91' + waNumber;
 
     // Update every WhatsApp href
     document.querySelectorAll('a[href*="wa.me"]').forEach(function (el) {
@@ -769,18 +803,18 @@
 
     // Update every tel: link
     document.querySelectorAll('a[href^="tel:"]').forEach(function (el) {
-      el.setAttribute('href', 'tel:+' + waNumber);
+      el.setAttribute('href', 'tel:+' + telNumber);
       var txt = el.textContent.trim();
-      if (/^\+?[\d\s\-()\u00a0]{7,}$/.test(txt) && phone) {
-        el.textContent = phone;
+      if (/^\+?[\d\s\-()\u00a0]{7,}$/.test(txt) && phoneDisplay) {
+        el.textContent = phoneDisplay;
       }
     });
 
     // Update contact-phone-link text
     var phoneLink = document.getElementById('contact-phone-link');
-    if (phoneLink && phone) {
-      phoneLink.textContent = phone;
-      phoneLink.setAttribute('href', 'tel:+' + waNumber);
+    if (phoneLink && phoneDisplay) {
+      phoneLink.textContent = phoneDisplay;
+      phoneLink.setAttribute('href', 'tel:+' + telNumber);
     }
 
     // Update address
@@ -794,7 +828,7 @@
 
     // Update Google Maps links
     if (s.googleMapsUrl) {
-      document.querySelectorAll('a[href*="maps.google"], a[href*="goo.gl/maps"]').forEach(function (el) {
+      document.querySelectorAll('a[href*="google.com/maps"], a[href*="maps.google"], a[href*="goo.gl/maps"]').forEach(function (el) {
         el.setAttribute('href', s.googleMapsUrl);
       });
     }
@@ -915,7 +949,7 @@
       .then(function (resp) {
         var items = (resp && resp.data) || [];
         if (!items.length) {
-          wrap.innerHTML = '<p class="gallery-empty">Shop photos and videos will appear here once uploaded via the admin panel.</p>';
+          wrap.innerHTML = '<p class="gallery-empty">Showroom photos and videos coming soon. Visit us at Memorial Hall Road, Park Town, Chennai.</p>';
           return;
         }
         wrap.innerHTML = items.map(buildItem).join('');
@@ -948,3 +982,10 @@
 
   document.addEventListener('DOMContentLoaded', initShopGallery);
 })();
+
+/* Dynamic copyright year */
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('[data-year]').forEach(function (el) {
+    el.textContent = String(new Date().getFullYear());
+  });
+});

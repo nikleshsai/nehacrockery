@@ -50,9 +50,10 @@ enum CatalogueRequestStatus {
 
 model User {
   id           String    @id @default(cuid())
+  // Supabase Auth user id (auth.users.id). Linked automatically on first login by email.
+  authId       String?   @unique @map("auth_id")
   name         String
   email        String    @unique
-  passwordHash String    @map("password_hash")
   role         UserRole  @default(STAFF)
   isActive     Boolean   @default(true) @map("is_active")
   lastLogin    DateTime? @map("last_login")

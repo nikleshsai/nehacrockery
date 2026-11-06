@@ -6,7 +6,6 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
-import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
@@ -59,7 +58,6 @@ app.use(
 // ── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
 app.use(compression());
 
 // ── HTTP request logging ─────────────────────────────────────────────────────
@@ -69,15 +67,11 @@ app.use(
   }),
 );
 
-// ── Static file serving (uploaded assets) ────────────────────────────────────
+// ── Legacy static file serving (pre-Supabase-Storage uploads, if any remain) ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-// ── Serve Admin Panel & Frontend at the same origin ──────────────────────────
-//    Admin panel : yourdomain.com/admin/
-//    Frontend    : yourdomain.com/  (root)
-const projectRoot = path.resolve(process.cwd(), '..');
-app.use('/admin', express.static(path.join(projectRoot, 'admin'), { index: 'index.html' }));
-app.use('/',      express.static(path.join(projectRoot, 'frontend'), { index: 'index.html' }));
+// The React frontend + /admin panel are deployed separately (Vercel) and talk
+// to this API over HTTPS; this server only exposes the REST API.
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/v1', apiRoutes);

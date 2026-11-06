@@ -1,14 +1,41 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Test setup — load test environment variables
+// Test setup — environment + Supabase mock (runs before every test file)
+// Real Supabase is never called from tests: tokens of the form
+//   "test-token:<email>"  are accepted as that user, anything else is rejected.
 // ─────────────────────────────────────────────────────────────────────────────
 import * as dotenv from 'dotenv';
+import { vi } from 'vitest';
 
 // Load test-specific environment or fall back to .env
 dotenv.config({ path: '.env.test', override: false });
 dotenv.config({ path: '.env', override: false });
 
-// Ensure required vars have test defaults
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
-process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-for-jest-at-least-64-chars-longgggggggggggggggg';
-process.env.DATABASE_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/neha_crockery_test?schema=public';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ??
+  'postgresql://postgres:postgres@localhost:5432/neha_crockery_test?schema=public';
+process.env.SUPABASE_URL = process.env.SUPABASE_URL ?? 'http://localhost:54321';
+process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'test-service-role-key';
 process.env.PORT = '4001';
+
+vi.mock('../src/config/supabase', () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      getUser: async (token: string) => {
+        const match = /^test-token:(.+)$/.exec(token ?? '');
+        if (!match) {
+          return { data: { user: null }, error: { message: 'invalid JWT' } };
+        }
+        const email = match[1];
+        return { data: { user: { id: `auth-${email}`, email } }, error: null };
+      },
+    },
+    storage: {
+      from: () => ({
+        upload: async () => ({ error: null }),
+        remove: async () => ({ error: null }),
+        getPublicUrl: (p: string) => ({ data: { publicUrl: `http://localhost/${p}` } }),
+      }),
+    },
+  }),
+}));

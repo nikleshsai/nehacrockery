@@ -1,29 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Product tests — CRUD, search, filtering, authorization
 // ─────────────────────────────────────────────────────────────────────────────
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app';
 import prisma from '../src/config/database';
-import bcrypt from 'bcryptjs';
 
-let adminToken: string;
 let createdProductId: string;
 let categoryId: string;
 let brandId: string;
 
 const ADMIN_EMAIL = 'product-test-admin@nehacrockery.com';
-const ADMIN_PASSWORD = 'TestPassword123!';
+// Mocked Supabase access token (see tests/setup.ts)
+const adminToken = `test-token:${ADMIN_EMAIL}`;
 
 beforeAll(async () => {
-  // Create test admin
-  const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  // Create test admin (role record; credentials live in Supabase Auth)
   await prisma.user.upsert({
     where: { email: ADMIN_EMAIL },
-    update: { passwordHash: hash, isActive: true },
+    update: { isActive: true },
     create: {
       name: 'Product Test Admin',
       email: ADMIN_EMAIL,
-      passwordHash: hash,
       role: 'SUPER_ADMIN',
       isActive: true,
     },
@@ -44,12 +42,6 @@ beforeAll(async () => {
     create: { name: 'Test Brand', slug: 'test-brand', isActive: true },
   });
   brandId = brand.id;
-
-  // Login to get token
-  const res = await request(app)
-    .post('/api/v1/auth/login')
-    .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
-  adminToken = res.body.data.token;
 });
 
 afterAll(async () => {

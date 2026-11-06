@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { PrismaClient, UserRole } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
 import slugify from 'slugify';
 import * as dotenv from 'dotenv';
 
@@ -20,27 +20,51 @@ function makeSlug(name: string): string {
 async function main() {
   console.log('🌱  Starting database seed...');
 
-  // ── Admin User ──────────────────────────────────────────────────────────────
-  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nehacrockery.com';
+  // ── Admin User (Supabase Auth + local role record) ──────────────────────────
+  const adminEmail = (process.env.ADMIN_EMAIL ?? 'admin@nehacrockery.com').toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'Change_Me_Now_123!';
   const adminName = process.env.ADMIN_NAME ?? 'Admin';
 
-  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
-  if (!existingAdmin) {
-    const passwordHash = await bcrypt.hash(adminPassword, 12);
-    await prisma.user.create({
-      data: {
-        name: adminName,
-        email: adminEmail,
-        passwordHash,
-        role: UserRole.SUPER_ADMIN,
-        isActive: true,
-      },
-    });
-    console.log(`✅  Admin user created: ${adminEmail}`);
-  } else {
-    console.log(`ℹ️   Admin user already exists: ${adminEmail}`);
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to seed the admin user');
   }
+  const supabase = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Find existing Supabase auth user (by email) or create one
+  let authId: string | undefined;
+  const { data: list, error: listErr } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  if (listErr) throw listErr;
+  authId = list.users.find((u) => u.email?.toLowerCase() === adminEmail)?.id;
+
+  if (!authId) {
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email: adminEmail,
+      password: adminPassword,
+      email_confirm: true,
+    });
+    if (createErr || !created.user) throw createErr ?? new Error('Failed to create Supabase user');
+    authId = created.user.id;
+    console.log(`✅  Supabase Auth user created: ${adminEmail}`);
+  } else {
+    console.log(`ℹ️   Supabase Auth user already exists: ${adminEmail}`);
+  }
+
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: { authId, isActive: true },
+    create: {
+      name: adminName,
+      email: adminEmail,
+      authId,
+      role: UserRole.SUPER_ADMIN,
+      isActive: true,
+    },
+  });
+  console.log(`✅  Admin role record ready: ${adminEmail}`);
 
   // ── Product Categories ──────────────────────────────────────────────────────
   const categories = [

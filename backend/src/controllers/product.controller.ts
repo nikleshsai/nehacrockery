@@ -10,14 +10,23 @@ import { AppError } from '../utils/AppError';
 
 // ── PUBLIC ────────────────────────────────────────────────────────────────────
 
+// Fields that must never be exposed on the public API
+function stripPrivate<T extends { wholesalePrice?: unknown }>(p: T): Omit<T, 'wholesalePrice'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { wholesalePrice, ...rest } = p;
+  return rest;
+}
+
 export async function listProducts(req: Request, res: Response): Promise<void> {
-  const { products, pagination } = await productService.listProducts(req.query as never);
-  sendPaginated(res, products, pagination);
+  // Public callers can only ever see active products, regardless of ?active=
+  const query = { ...req.query, active: 'true' } as never;
+  const { products, pagination } = await productService.listProducts(query);
+  sendPaginated(res, products.map(stripPrivate), pagination);
 }
 
 export async function getProduct(req: Request, res: Response): Promise<void> {
   const product = await productService.getProductBySlug(req.params.slug);
-  sendSuccess(res, product);
+  sendSuccess(res, stripPrivate(product));
 }
 
 // ── ADMIN ─────────────────────────────────────────────────────────────────────

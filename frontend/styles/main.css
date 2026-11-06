@@ -2796,3 +2796,10 @@ address { font-style: normal; }
   margin-top: 12px;
   text-align: center;
 }
+/* ── UI icons (replace emoji) + footer contact block ── */
+.ui-icon{width:16px;height:16px;margin-right:6px;vertical-align:-3px;flex-shrink:0}
+.ui-icon--lg{width:40px;height:40px;margin:0}
+.home-page-card-icon .ui-icon,.taroba-cat-icon .ui-icon{width:26px;height:26px;margin:0;vertical-align:middle}
+.footer-address{font-style:normal;font-size:.85rem;line-height:1.9;margin-top:16px;max-width:300px;opacity:.9}
+.footer-address .footer-link{display:inline}
+.brand-card-count{display:block;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;opacity:.65;margin-top:4px}

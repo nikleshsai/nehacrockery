@@ -108,8 +108,31 @@
     overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
   }
 
+  /* ── COLD-START BANNER ───────────────────────────────────────────────────── */
+  var _wakeToast = null;
+  function showWakeBanner() {
+    if (_wakeToast) return;
+    var el = document.createElement('div');
+    el.id = 'wake-banner';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+      'background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;' +
+      'padding:12px 24px;border-radius:40px;font-size:.85rem;font-weight:600;' +
+      'box-shadow:0 4px 20px rgba(37,99,235,.4);z-index:9999;' +
+      'display:flex;align-items:center;gap:10px;pointer-events:none;';
+    el.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>' +
+      'Backend is waking up \u2014 retrying in 5 seconds\u2026';
+    document.body.appendChild(el);
+    _wakeToast = el;
+  }
+  function hideWakeBanner() {
+    if (_wakeToast) { _wakeToast.remove(); _wakeToast = null; }
+  }
+
   /* ── API CALL ────────────────────────────────────────────────────────────── */
-  function api(method, path, body, cb, isFormData) {
+  // Track in-flight GET requests so we can abort duplicates (reduces latency)
+  var _abortControllers = {};
+
+  function api(method, path, body, cb, isFormData, _retryCount) {
     var opts = { method: method, headers: {} };
     if (state.token) opts.headers['Authorization'] = 'Bearer ' + state.token;
     if (body && !isFormData) {
@@ -118,10 +141,52 @@
     } else if (body && isFormData) {
       opts.body = body; // FormData — no Content-Type header
     }
+
+    // For GET requests: cancel any previous identical request to avoid stale races
+    if (method === 'GET' && window.AbortController) {
+      var key = path.split('?')[0]; // group by endpoint (ignore query)
+      if (_abortControllers[key]) {
+        try { _abortControllers[key].abort(); } catch(e) {}
+      }
+      var ctrl = new AbortController();
+      _abortControllers[key] = ctrl;
+      opts.signal = ctrl.signal;
+    }
+
+    var retries = _retryCount || 0;
+
     fetch(API + path, opts)
       .then(function (res) {
+        // Detect cold-start: Render wakes with HTML instead of JSON
+        var ct = res.headers.get('content-type') || '';
+        var isColdStart = !ct.includes('application/json') &&
+          (res.status === 502 || res.status === 503 || ct.includes('text/html'));
+
+        if (isColdStart && retries < 2) {
+          showWakeBanner();
+          setTimeout(function () {
+            api(method, path, body, function (err2, data2) {
+              hideWakeBanner();
+              cb(err2, data2);
+            }, isFormData, retries + 1);
+          }, 5000);
+          return;
+        }
+        hideWakeBanner();
+
         if (res.status === 204) { cb(null, null); return; }
-        return res.json().then(function (j) {
+
+        // Parse response text first to catch HTML error pages
+        return res.text().then(function (text) {
+          if (text.trimStart().startsWith('<')) {
+            cb(new Error('Server returned an unexpected page (status ' + res.status + '). The backend may be starting up — please try again in a moment.'), null);
+            return;
+          }
+          var j;
+          try { j = JSON.parse(text); } catch (e) {
+            cb(new Error('Invalid server response: ' + e.message), null);
+            return;
+          }
           if (res.status >= 400) {
             cb(new Error(j.message || 'Error ' + res.status), null);
           } else {
@@ -129,8 +194,24 @@
           }
         });
       })
-      .catch(function (err) { cb(err, null); });
+      .catch(function (err) {
+        if (err.name === 'AbortError') return; // silently ignore aborted requests
+        // Network error — retry once after 5s
+        if (retries < 1) {
+          showWakeBanner();
+          setTimeout(function () {
+            api(method, path, body, function (err2, data2) {
+              hideWakeBanner();
+              cb(err2, data2);
+            }, isFormData, retries + 1);
+          }, 5000);
+          return;
+        }
+        hideWakeBanner();
+        cb(new Error('Network error: ' + err.message), null);
+      });
   }
+
 
   /* ── PAGINATION ─────────────────────────────────────────────────────────── */
   function renderPagination(containerId, pg, goTo) {
@@ -284,6 +365,8 @@
       showDashboard();
     } else {
       setupLogin();
+      // Ping backend health endpoint and update the status indicator on the login page
+      pingBackendStatus();
     }
 
     // Wire gallery upload form
@@ -298,6 +381,31 @@
   });
 
   /* ── LOGIN ───────────────────────────────────────────────────────────────── */
+
+  function pingBackendStatus() {
+    var dot  = $('backend-dot');
+    var text = $('backend-status-text');
+    if (!dot || !text) return;
+
+    var start = Date.now();
+    fetch(API + '/health', { method: 'GET', signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined })
+      .then(function (res) {
+        var ms = Date.now() - start;
+        if (res.ok || res.status === 404) {
+          // 404 means the server is UP (just no /health route), treat as online
+          dot.style.background = '#10b981';
+          text.textContent = 'Backend online (' + ms + 'ms)';
+        } else {
+          dot.style.background = '#ef4444';
+          text.textContent = 'Backend error (status ' + res.status + ')';
+        }
+      })
+      .catch(function () {
+        // Likely cold-starting or network error
+        dot.style.background = '#f59e0b';
+        text.textContent = 'Backend is sleeping \u2014 first request may be slow';
+      });
+  }
 
   /* -- LOGIN (Supabase Auth) -- */
   function setupLogin() {
@@ -642,6 +750,56 @@
     $('pf-new-arrival').checked = p ? !!p.isNewArrival : false;
     $('pf-active').checked = p ? (p.isActive !== false) : true;
 
+    // ── Image fields ──────────────────────────────────────────────────────
+    var imageUrl = p ? (p.imageUrl || p.image || p.primaryImage || '') : '';
+    var urlInput = $('pf-image-url');
+    var fileInput = $('pf-image-file');
+    var previewWrap = $('pf-img-preview-wrap');
+    var previewImg  = $('pf-img-preview');
+    var previewName = $('pf-img-preview-name');
+    var clearBtn    = $('pf-img-clear');
+
+    if (urlInput) urlInput.value = imageUrl;
+    if (fileInput) fileInput.value = '';
+
+    function refreshPreview(url) {
+      if (!previewWrap || !previewImg) return;
+      if (url) {
+        previewWrap.style.display = '';
+        previewImg.src = url;
+        if (previewName) previewName.textContent = url.length > 60 ? '…' + url.slice(-57) : url;
+      } else {
+        previewWrap.style.display = 'none';
+        previewImg.src = '';
+      }
+    }
+    refreshPreview(imageUrl);
+
+    // Live preview when user types a URL
+    if (urlInput) {
+      urlInput.oninput = function () { refreshPreview(urlInput.value.trim()); };
+    }
+    // Live preview when a file is selected
+    if (fileInput) {
+      fileInput.onchange = function () {
+        var f = fileInput.files[0];
+        if (f) {
+          var reader = new FileReader();
+          reader.onload = function (e) { refreshPreview(e.target.result); };
+          reader.readAsDataURL(f);
+          if (urlInput) urlInput.value = ''; // clear URL when file chosen
+        }
+      };
+    }
+    // Remove button clears both
+    if (clearBtn) {
+      clearBtn.onclick = function () {
+        if (urlInput) urlInput.value = '';
+        if (fileInput) fileInput.value = '';
+        refreshPreview('');
+      };
+    }
+
     // Set brand/category selects
     var brandSel = $('pf-brand');
     if (brandSel && p && p.brand) {
@@ -664,6 +822,7 @@
     $('product-form-error').textContent = '';
     openModal('product-modal');
   }
+
 
   /* ── CATEGORIES ──────────────────────────────────────────────────────────── */
   function loadCategories() {
@@ -842,9 +1001,14 @@
   }
 
   window.editCatalogue = function (id) {
+    if (state._catalogues) {
+      var cat = state._catalogues.find(function (c) { return c.id === id; });
+      if (cat) { openCatalogueModal(cat); return; }
+    }
     api('GET', '/admin/catalogues', null, function (err, data) {
       if (err) { toast('Failed: ' + err.message, 'error'); return; }
-      var cat = (data.data || []).find(function (c) { return c.id === id; });
+      state._catalogues = data.data || [];
+      var cat = state._catalogues.find(function (c) { return c.id === id; });
       if (cat) openCatalogueModal(cat);
     });
   };
@@ -869,80 +1033,6 @@
     if (c) { $('catf-file-group').style.display = 'none'; } else { $('catf-file-group').style.display = ''; }
     $('catalogue-form-error').textContent = '';
     openModal('catalogue-modal');
-  }
-
-  /* ── HOMEPAGE MANAGEMENT ─────────────────────────────────────────────────── */
-  function loadHomepage() {
-    loadBanners();
-    loadFeaturedProducts();
-    loadNewArrivals();
-    loadReviews();
-  }
-
-  // Homepage sub-tabs
-  document.querySelectorAll('[data-hptab]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('[data-hptab]').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      document.querySelectorAll('[id^="hptab-"]').forEach(function (el) { el.classList.add('hidden'); });
-      var target = $('hptab-' + btn.dataset.hptab);
-      if (target) target.classList.remove('hidden');
-    });
-  });
-
-  function loadBanners() {
-    var tbody = $('banners-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="td-loading">Loading…</td></tr>';
-    api('GET', '/admin/banners', null, function (err, data) {
-      if (err) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty text-danger">' + esc(err.message) + '</td></tr>'; return; }
-      var banners = data.data || [];
-      if (!banners.length) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty">No banners yet</td></tr>'; return; }
-      tbody.innerHTML = banners.map(function (b) {
-        return '<tr>' +
-          '<td>' + b.sortOrder + '</td>' +
-          '<td><strong>' + esc(b.title) + '</strong></td>' +
-          '<td class="text-muted">' + esc(b.subtitle || '—') + '</td>' +
-          '<td>' + (b.buttonText ? esc(b.buttonText) + ' → ' + esc(b.buttonUrl || '') : '—') + '</td>' +
-          '<td><span class="badge ' + (b.isActive ? 'badge-active' : 'badge-inactive') + '">' + (b.isActive ? 'Active' : 'Hidden') + '</span></td>' +
-          '<td><div style="display:flex;gap:6px;">' +
-          '<button class="btn btn-sm btn-ghost" onclick="editBanner(\'' + b.id + '\')">Edit</button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteBanner(\'' + b.id + '\',\'' + esc(b.title).replace(/'/g, "\\'") + '\')">Del</button>' +
-          '</div></td></tr>';
-      }).join('');
-    });
-  }
-
-  window.editBanner = function (id) {
-    api('GET', '/admin/banners', null, function (err, data) {
-      if (err) { toast('Failed: ' + err.message, 'error'); return; }
-      var banner = (data.data || []).find(function (b) { return b.id === id; });
-      if (banner) openBannerModal(banner);
-    });
-  };
-
-  window.deleteBanner = function (id, title) {
-    confirm('Delete Banner', 'Delete banner "' + title + '"?', function () {
-      api('DELETE', '/admin/banners/' + id, null, function (err) {
-        if (err) { toast('Delete failed: ' + err.message, 'error'); return; }
-        toast('Banner deleted', 'success');
-        loadBanners();
-      });
-    });
-  };
-
-  function openBannerModal(b) {
-    $('banner-modal-title').textContent = b ? 'Edit Banner' : 'Add Banner';
-    $('bnf-id').value = b ? b.id : '';
-    $('bnf-title').value = b ? (b.title || '') : '';
-    $('bnf-subtitle').value = b ? (b.subtitle || '') : '';
-    $('bnf-image').value = b ? (b.image || '') : '';
-    $('bnf-btn-text').value = b ? (b.buttonText || '') : '';
-    $('bnf-btn-url').value = b ? (b.buttonUrl || '') : '';
-    $('bnf-sort').value = b ? (b.sortOrder || 0) : 0;
-    $('bnf-active').checked = b ? (b.isActive !== false) : true;
-    $('banner-form-error').textContent = '';
-    openModal('banner-modal');
   }
 
   function loadFeaturedProducts() {
@@ -985,6 +1075,102 @@
     });
   }
 
+  /* ── HOMEPAGE MANAGEMENT ─────────────────────────────────────────────────── */
+  // Track which tabs have been loaded to avoid redundant API calls
+  var _hpTabLoaded = {};
+
+  function loadHomepage() {
+    // Only load the currently active tab (lazy-load the rest on click)
+    _hpTabLoaded = {};
+    loadBanners(); // banners is the default active tab
+    _hpTabLoaded['banners'] = true;
+  }
+
+  // Homepage sub-tabs — lazy load each tab on first visit
+  document.querySelectorAll('[data-hptab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('[data-hptab]').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('[id^="hptab-"]').forEach(function (el) { el.classList.add('hidden'); });
+      var tab = btn.dataset.hptab;
+      var target = $('hptab-' + tab);
+      if (target) target.classList.remove('hidden');
+      // Lazy-load: only fetch if not yet loaded or section is active
+      if (!_hpTabLoaded[tab]) {
+        _hpTabLoaded[tab] = true;
+        var tabLoaders = {
+          banners: loadBanners,
+          featured: loadFeaturedProducts,
+          'new-arrivals': loadNewArrivals,
+          reviews: loadReviews,
+        };
+        if (tabLoaders[tab]) tabLoaders[tab]();
+      }
+    });
+  });
+
+
+  function loadBanners() {
+    var tbody = $('banners-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="td-loading">Loading…</td></tr>';
+    api('GET', '/admin/banners', null, function (err, data) {
+      if (err) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty text-danger">' + esc(err.message) + '</td></tr>'; return; }
+      var banners = data.data || [];
+      if (!banners.length) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty">No banners yet</td></tr>'; return; }
+      tbody.innerHTML = banners.map(function (b) {
+        return '<tr>' +
+          '<td>' + b.sortOrder + '</td>' +
+          '<td><strong>' + esc(b.title) + '</strong></td>' +
+          '<td class="text-muted">' + esc(b.subtitle || '—') + '</td>' +
+          '<td>' + (b.buttonText ? esc(b.buttonText) + ' → ' + esc(b.buttonUrl || '') : '—') + '</td>' +
+          '<td><span class="badge ' + (b.isActive ? 'badge-active' : 'badge-inactive') + '">' + (b.isActive ? 'Active' : 'Hidden') + '</span></td>' +
+          '<td><div style="display:flex;gap:6px;">' +
+          '<button class="btn btn-sm btn-ghost" onclick="editBanner(\'' + b.id + '\')">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteBanner(\'' + b.id + '\',\'' + esc(b.title).replace(/'/g, "\\'") + '\')">Del</button>' +
+          '</div></td></tr>';
+      }).join('');
+    });
+  }
+
+  window.editBanner = function (id) {
+    // Use cached list data from state if available to avoid a redundant fetch
+    if (state._banners) {
+      var banner = state._banners.find(function (b) { return b.id === id; });
+      if (banner) { openBannerModal(banner); return; }
+    }
+    api('GET', '/admin/banners', null, function (err, data) {
+      if (err) { toast('Failed: ' + err.message, 'error'); return; }
+      state._banners = data.data || [];
+      var banner = state._banners.find(function (b) { return b.id === id; });
+      if (banner) openBannerModal(banner);
+    });
+  };
+
+  window.deleteBanner = function (id, title) {
+    confirm('Delete Banner', 'Delete banner "' + title + '"?', function () {
+      api('DELETE', '/admin/banners/' + id, null, function (err) {
+        if (err) { toast('Delete failed: ' + err.message, 'error'); return; }
+        toast('Banner deleted', 'success');
+        loadBanners();
+      });
+    });
+  };
+
+  function openBannerModal(b) {
+    $('banner-modal-title').textContent = b ? 'Edit Banner' : 'Add Banner';
+    $('bnf-id').value = b ? b.id : '';
+    $('bnf-title').value = b ? (b.title || '') : '';
+    $('bnf-subtitle').value = b ? (b.subtitle || '') : '';
+    $('bnf-image').value = b ? (b.image || '') : '';
+    $('bnf-btn-text').value = b ? (b.buttonText || '') : '';
+    $('bnf-btn-url').value = b ? (b.buttonUrl || '') : '';
+    $('bnf-sort').value = b ? (b.sortOrder || 0) : 0;
+    $('bnf-active').checked = b ? (b.isActive !== false) : true;
+    $('banner-form-error').textContent = '';
+    openModal('banner-modal');
+  }
+
   function loadReviews() {
     var tbody = $('reviews-tbody');
     if (!tbody) return;
@@ -1012,9 +1198,14 @@
   }
 
   window.editReview = function (id) {
+    if (state._reviews) {
+      var r = state._reviews.find(function (x) { return x.id === id; });
+      if (r) { openReviewModal(r); return; }
+    }
     api('GET', '/admin/reviews', null, function (err, data) {
       if (err) { toast('Failed: ' + err.message, 'error'); return; }
-      var r = (data.data || []).find(function (x) { return x.id === id; });
+      state._reviews = data.data || [];
+      var r = state._reviews.find(function (x) { return x.id === id; });
       if (r) openReviewModal(r);
     });
   };
@@ -1515,47 +1706,78 @@
     var id = $('pf-id').value;
     var name = $('pf-name').value.trim();
     if (!name) { $('product-form-error').textContent = 'Product name is required.'; return; }
-    var body = {
-      name: name,
-      productCode: $('pf-code').value.trim() || null,
-      collection: $('pf-collection').value.trim() || null,
-      brandId: $('pf-brand').value || null,
-      categoryId: $('pf-category').value || null,
-      subcategory: $('pf-subcategory').value.trim() || null,
-      colourFinish: $('pf-colour').value.trim() || null,
-      material: $('pf-material').value.trim() || null,
-      capacity: $('pf-capacity').value.trim() || null,
-      dimensions: $('pf-dimensions').value.trim() || null,
-      setContents: $('pf-set-contents').value.trim() || null,
-      piecesPerSet: $('pf-pieces').value ? parseInt($('pf-pieces').value) : null,
-      caseQty: $('pf-case-qty').value ? parseInt($('pf-case-qty').value) : null,
-      packagingInformation: $('pf-packaging').value.trim() || null,
-      features: $('pf-features').value ? $('pf-features').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [],
-      mrp: $('pf-mrp').value ? parseFloat($('pf-mrp').value) : null,
-      catalogueMrp: $('pf-catalogue-mrp').value ? parseFloat($('pf-catalogue-mrp').value) : null,
-      websitePrice: $('pf-website-price').value ? parseFloat($('pf-website-price').value) : null,
-      wholesalePrice: $('pf-wholesale-price').value ? parseFloat($('pf-wholesale-price').value) : null,
-      priceUnit: $('pf-price-unit').value.trim() || null,
-      cataloguePage: $('pf-catalogue-page').value.trim() || null,
-      seoTitle: $('pf-seo-title').value.trim() || null,
-      seoDescription: $('pf-seo-desc').value.trim() || null,
-      description: $('pf-description').value.trim() || null,
-      isFeatured: $('pf-featured').checked,
-      isNewArrival: $('pf-new-arrival').checked,
-      isActive: $('pf-active').checked,
-    };
+
+    var fileInput = $('pf-image-file');
+    var urlInput  = $('pf-image-url');
+    var hasFile   = fileInput && fileInput.files && fileInput.files[0];
+
     var btn = $('product-save-btn');
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving…';
-    var method = id ? 'PUT' : 'POST';
-    var path = id ? '/admin/products/' + id : '/admin/products';
-    api(method, path, body, function (err) {
-      btn.disabled = false; btn.textContent = 'Save Product';
-      if (err) { $('product-form-error').textContent = err.message; return; }
-      toast(id ? 'Product updated!' : 'Product created!', 'success');
-      closeModal('product-modal');
-      loadProducts(state.pages.products);
-    });
+
+    function doSave(imageUrl) {
+      var body = {
+        name: name,
+        productCode: $('pf-code').value.trim() || null,
+        collection: $('pf-collection').value.trim() || null,
+        brandId: $('pf-brand').value || null,
+        categoryId: $('pf-category').value || null,
+        subcategory: $('pf-subcategory').value.trim() || null,
+        colourFinish: $('pf-colour').value.trim() || null,
+        material: $('pf-material').value.trim() || null,
+        capacity: $('pf-capacity').value.trim() || null,
+        dimensions: $('pf-dimensions').value.trim() || null,
+        setContents: $('pf-set-contents').value.trim() || null,
+        piecesPerSet: $('pf-pieces').value ? parseInt($('pf-pieces').value) : null,
+        caseQty: $('pf-case-qty').value ? parseInt($('pf-case-qty').value) : null,
+        packagingInformation: $('pf-packaging').value.trim() || null,
+        features: $('pf-features').value ? $('pf-features').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [],
+        mrp: $('pf-mrp').value ? parseFloat($('pf-mrp').value) : null,
+        catalogueMrp: $('pf-catalogue-mrp').value ? parseFloat($('pf-catalogue-mrp').value) : null,
+        websitePrice: $('pf-website-price').value ? parseFloat($('pf-website-price').value) : null,
+        wholesalePrice: $('pf-wholesale-price').value ? parseFloat($('pf-wholesale-price').value) : null,
+        priceUnit: $('pf-price-unit').value.trim() || null,
+        cataloguePage: $('pf-catalogue-page').value.trim() || null,
+        seoTitle: $('pf-seo-title').value.trim() || null,
+        seoDescription: $('pf-seo-desc').value.trim() || null,
+        description: $('pf-description').value.trim() || null,
+        isFeatured: $('pf-featured').checked,
+        isNewArrival: $('pf-new-arrival').checked,
+        isActive: $('pf-active').checked,
+      };
+      if (imageUrl !== undefined) body.imageUrl = imageUrl;
+
+      var method = id ? 'PUT' : 'POST';
+      var path = id ? '/admin/products/' + id : '/admin/products';
+      api(method, path, body, function (err) {
+        btn.disabled = false; btn.textContent = 'Save Product';
+        if (err) { $('product-form-error').textContent = err.message; return; }
+        toast(id ? 'Product updated!' : 'Product created!', 'success');
+        closeModal('product-modal');
+        loadProducts(state.pages.products);
+      });
+    }
+
+    if (hasFile) {
+      // Upload image first, then save product with returned URL
+      var fd = new FormData();
+      fd.append('file', fileInput.files[0]);
+      api('POST', '/admin/upload/image', fd, function (err, data) {
+        if (err) {
+          // If dedicated upload endpoint doesn't exist, fall back to URL-only save
+          toast('Image upload failed (' + err.message + '), saving without image.', 'warning');
+          doSave(urlInput ? urlInput.value.trim() || undefined : undefined);
+          return;
+        }
+        var uploadedUrl = (data && (data.url || data.imageUrl || data.path)) || '';
+        doSave(uploadedUrl || (urlInput ? urlInput.value.trim() : '') || undefined);
+      }, true);
+    } else {
+      // No file — use URL field value (or undefined to leave image unchanged)
+      var rawUrl = urlInput ? urlInput.value.trim() : '';
+      doSave(rawUrl || undefined);
+    }
   }
+
 
   function saveCategory() {
     var id = $('cf-id').value;
@@ -1812,42 +2034,57 @@
   function loadShopGallery() {
     var grid = $('gallery-admin-grid');
     if (!grid) return;
-    grid.innerHTML = '<p style="color:#888;font-size:.9rem;">Loading...</p>';
+    grid.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--c-muted);"><span class="spinner spinner-dark"></span> Loading gallery…</div>';
     api('GET', '/admin/shop-media', null, function (err, data) {
-      if (err) { grid.innerHTML = '<p style="color:red;">Failed to load gallery.</p>'; return; }
+      if (err) {
+        grid.innerHTML =
+          '<div style="padding:24px;text-align:center;">' +
+          '<div style="font-size:2rem;margin-bottom:8px;">\u26a0\ufe0f</div>' +
+          '<p style="color:var(--c-danger);font-weight:600;margin-bottom:12px;">Failed to load gallery: ' + esc(err.message) + '</p>' +
+          '<button class="btn btn-ghost btn-sm" onclick="loadShopGallery()">\u21bb Retry</button>' +
+          '</div>';
+        return;
+      }
       var items = (data && data.data) || [];
       if (!items.length) {
-        grid.innerHTML = '<p style="color:#888;font-size:.9rem;">No media uploaded yet. Click "Upload Media" to add shop photos or videos.</p>';
+        grid.innerHTML =
+          '<div style="padding:40px;text-align:center;color:var(--c-muted);">' +
+          '<div style="font-size:3rem;margin-bottom:12px;">\ud83d\udcf7</div>' +
+          '<p style="font-size:.9rem;margin-bottom:16px;">No media uploaded yet.</p>' +
+          '<button class="btn btn-primary btn-sm" onclick="openGalleryUpload()">+ Upload Media</button>' +
+          '</div>';
         return;
       }
       grid.innerHTML = items.map(function (item) {
-        var thumb = item.mediaType === 'video'
-          ? (item.thumbnailUrl
-            ? '<img src="' + esc(item.thumbnailUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" />'
-            : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#1a2b4a,#3a5a8a);display:flex;align-items:center;justify-content:center;border-radius:8px 8px 0 0;"><span style="font-size:2rem;color:rgba(255,255,255,.8);">&#9654;</span></div>')
-          : '<img src="' + esc(item.mediaUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.style.background=\'#eee\';" />';
+        var thumb;
+        if (item.mediaType === 'video') {
+          thumb = item.thumbnailUrl
+            ? '<img src="' + esc(item.thumbnailUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'/%3E\';this.style.background=\'#1a2b4a\'">'
+            : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#1a2b4a,#3a5a8a);display:flex;align-items:center;justify-content:center;border-radius:8px 8px 0 0;"><span style="font-size:2.5rem;color:rgba(255,255,255,.8);">\u25b6</span></div>';
+        } else {
+          thumb = '<img src="' + esc(item.mediaUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.style.background=\'#f1f5f9\';this.alt=\'Image not found\';this.style.display=\'flex\';" />';
+        }
         var badge = item.mediaType === 'video'
-          ? '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;font-size:.7rem;padding:2px 8px;border-radius:20px;">&#9654; Video</span>'
+          ? '<span style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:.7rem;padding:2px 8px;border-radius:20px;font-weight:600;">\u25b6 Video</span>'
           : '';
-        var activeToggle = item.isActive
+        var statusBadge = item.isActive
           ? '<span style="font-size:.7rem;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;font-weight:600;">Active</span>'
           : '<span style="font-size:.7rem;background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:20px;font-weight:600;">Hidden</span>';
         return '<div style="background:#fff;border-radius:8px;box-shadow:0 1px 8px rgba(0,0,0,.08);overflow:hidden;position:relative;">' +
           '<div style="position:relative;">' + thumb + badge + '</div>' +
           '<div style="padding:10px;">' +
-          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
-          '<span style="font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(item.title || '(no title)') + '</span>' +
-          activeToggle +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+          '<span style="font-size:.82rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">' + esc(item.title || '(no title)') + '</span>' +
+          statusBadge +
           '</div>' +
-          '<div style="display:flex;gap:6px;margin-top:8px;">' +
+          '<div style="display:flex;gap:6px;">' +
           '<button class="btn btn-sm" onclick="toggleGalleryActive(\'' + esc(item.id) + '\',' + (!item.isActive) + ')" style="flex:1;font-size:.72rem;">' + (item.isActive ? 'Hide' : 'Show') + '</button>' +
           '<button class="btn btn-sm btn-danger" onclick="deleteGalleryItem(\'' + esc(item.id) + '\')" style="font-size:.72rem;">Delete</button>' +
-          '</div>' +
-          '</div>' +
-          '</div>';
+          '</div></div></div>';
       }).join('');
     });
   }
+
 
   function openGalleryUpload() {
     var wrap = $('gallery-upload-form-wrap');

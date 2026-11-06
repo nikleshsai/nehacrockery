@@ -1,22 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Authentication & Authorization middleware
-// Supports: own JWT (HS256) + Supabase JWT (ES256, verified via Supabase SDK)
+// Authentication: Supabase Auth access tokens (verified through the Supabase SDK)
+// Authorization : role-based access control (RBAC) via the local `users` table
 // ─────────────────────────────────────────────────────────────────────────────
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { UserRole } from '@prisma/client';
 import { AppError } from '../utils/AppError';
-import { config } from '../config/env';
 import prisma from '../config/database';
 import { getSupabaseClient } from '../config/supabase';
-
-interface JwtPayload {
-  userId?: string;      // Own JWT
-  sub?: string;         // Supabase JWT (user UUID)
-  email?: string;
-  role?: UserRole;
-  iss?: string;         // Supabase JWT issuer
-}
 
 // Augment Express Request type
 declare global {
@@ -33,25 +24,9 @@ declare global {
 }
 
 /**
- * Returns true if the token looks like a Supabase JWT.
- * Supabase tokens have "iss" containing "supabase" in their payload.
- * We check this WITHOUT verifying the signature (safe — we verify via SDK next).
- */
-function looksLikeSupabaseToken(token: string): boolean {
-  try {
-    const decoded = jwt.decode(token) as JwtPayload | null;
-    if (!decoded) return false;
-    // Supabase tokens have iss like "https://<ref>.supabase.co/auth/v1"
-    return !!(decoded.sub && decoded.iss && decoded.iss.includes('supabase'));
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Verifies the JWT from the Authorization header or cookie.
- * Accepts both our own HS256 JWT and Supabase ES256 JWT tokens.
- * Attaches decoded user to req.user.
+ * Verifies the Supabase access token from the Authorization header
+ * (`Authorization: Bearer <access_token>`) and attaches the matching
+ * local user (with role) to req.user.
  */
 export async function authenticate(
   req: Request,
@@ -59,62 +34,56 @@ export async function authenticate(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const token =
-      (req.cookies as Record<string, string>)?.['nch_token'] ??
-      (req.headers.authorization?.startsWith('Bearer ')
-        ? req.headers.authorization.slice(7)
-        : undefined);
+    const header = req.headers.authorization;
+    const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : undefined;
 
     if (!token) {
       throw AppError.unauthorized('Authentication token is required');
     }
 
-    let userEmail: string | undefined;
-    let userId: string | undefined;
-
-    // ── Check if this is a Supabase token ──────────────────────────────────
-    if (looksLikeSupabaseToken(token)) {
-      // Verify via Supabase SDK (handles ES256 automatically)
-      try {
-        const supabase = getSupabaseClient();
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data.user) {
-          throw AppError.unauthorized('Invalid or expired Supabase token');
-        }
-        userEmail = data.user.email;
-      } catch (err) {
-        if (err instanceof AppError) throw err;
+    // ── Verify token with Supabase Auth ─────────────────────────────────────
+    let authUserId: string;
+    let authEmail: string;
+    try {
+      const { data, error } = await getSupabaseClient().auth.getUser(token);
+      if (error || !data.user || !data.user.email) {
         throw AppError.unauthorized('Invalid or expired token');
       }
-    } else {
-      // ── Fall back to our own HS256 JWT ────────────────────────────────────
-      try {
-        const payload = jwt.verify(token, config.jwt.secret) as JwtPayload;
-        userId = payload.userId;
-        userEmail = payload.email;
-      } catch (err) {
-        if (err instanceof jwt.JsonWebTokenError) {
-          throw AppError.unauthorized('Invalid or expired token');
-        }
-        throw err;
+      authUserId = data.user.id;
+      authEmail = data.user.email;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw AppError.unauthorized('Invalid or expired token');
+    }
+
+    // ── Map Supabase user → local user (role, active flag) ─────────────────
+    const select = {
+      id: true,
+      authId: true,
+      email: true,
+      role: true,
+      name: true,
+      isActive: true,
+    } as const;
+
+    let user = await prisma.user.findUnique({ where: { authId: authUserId }, select });
+
+    if (!user) {
+      // First login: link by email (case-insensitive)
+      const byEmail = await prisma.user.findFirst({
+        where: { email: { equals: authEmail, mode: 'insensitive' } },
+        select,
+      });
+      if (byEmail) {
+        await prisma.user.update({
+          where: { id: byEmail.id },
+          data: { authId: authUserId, lastLogin: new Date() },
+        });
+        user = { ...byEmail, authId: authUserId };
       }
     }
 
-    // ── Look up user in DB ──────────────────────────────────────────────────
-    let user: { id: string; email: string; role: UserRole; name: string; isActive: boolean } | null = null;
-
-    if (userEmail) {
-      user = await prisma.user.findFirst({
-        where: { email: { equals: userEmail, mode: 'insensitive' } },
-        select: { id: true, email: true, role: true, name: true, isActive: true },
-      });
-    } else if (userId) {
-      user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, role: true, name: true, isActive: true },
-      });
-    }
-
+    // A valid Supabase account without a local admin record has no access.
     if (!user || !user.isActive) {
       throw AppError.unauthorized('Account is not active or not found');
     }
@@ -122,11 +91,7 @@ export async function authenticate(
     req.user = { id: user.id, email: user.email, role: user.role, name: user.name };
     next();
   } catch (err) {
-    if (err instanceof jwt.JsonWebTokenError) {
-      next(AppError.unauthorized('Invalid or expired token'));
-    } else {
-      next(err);
-    }
+    next(err);
   }
 }
 
