@@ -161,12 +161,12 @@ export default function ContactPage() {
           </iframe>
         </div>
         <div className="container map-footer">
-          <a href={c.mapsUrl} className="btn-primary" target="_blank" rel="noopener">
+          <a href={c.mapsUrl} className="btn-primary" target="_blank" rel="noopener noreferrer">
             Get Directions &#8594;
           </a>
           {' '}
-          <a href={c.telHref} className="btn-secondary">
-            Call Before Visiting
+          <a href={c.telHref} className="btn-secondary" title={`Call ${c.phoneDisplay}`}>
+            Call {c.phoneDisplay} &#8594;
           </a>
         </div>
       </section>

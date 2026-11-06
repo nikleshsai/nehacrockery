@@ -30,7 +30,7 @@ export default function TarobaPage() {
               The in-house brand of Neha Crockery House — quality kitchen and tableware under our own trusted label.
             </p>
             <div className="page-banner-ctas">
-              <a href={c.wa("Hello, I want to enquire about Taroba brand products.")} className="btn-whatsapp" target="_blank" rel="noopener">
+              <a href={c.wa("Hello, I would like to enquire about Taroba brand products.")} className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 WhatsApp Enquiry
               </a>
             </div>
@@ -153,12 +153,12 @@ export default function TarobaPage() {
               Contact us for wholesale pricing on Taroba brand products. Available for retailers, hotels and distributors.
             </p>
             <div className="taroba-enq-ctas">
-              <a href={c.wa("Hello, I want to enquire about Taroba brand products and pricing.")} className="btn-whatsapp" target="_blank" rel="noopener">
+              <a href={c.wa("Hello, I would like to enquire about Taroba brand products and wholesale pricing.")} className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
                 WhatsApp Enquiry
               </a>
               {' '}
-              <a href={c.telHref} className="btn-primary">
-                Call Now &#8594;
+              <a href={c.telHref} className="btn-primary" title={`Call ${c.phoneDisplay}`}>
+                Call {c.phoneDisplay} &#8594;
               </a>
             </div>
           </div>

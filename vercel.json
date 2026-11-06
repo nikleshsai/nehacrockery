@@ -2,6 +2,53 @@
   "buildCommand": "",
   "outputDirectory": ".",
   "installCommand": "",
+  "redirects": [
+    {
+      "source": "/frontend/admin",
+      "destination": "/admin",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/admin/:path*",
+      "destination": "/admin/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/frontend",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/index",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms).html",
+      "destination": "/:page",
+      "permanent": true
+    },
+    {
+      "source": "/frontend/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms)",
+      "destination": "/:page",
+      "permanent": true
+    },
+    {
+      "source": "/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms).html",
+      "destination": "/:page",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -24,8 +71,61 @@
       "destination": "/frontend/index.html"
     },
     {
+      "source": "/about",
+      "destination": "/frontend/about.html"
+    },
+    {
+      "source": "/products",
+      "destination": "/frontend/products.html"
+    },
+    {
+      "source": "/product",
+      "destination": "/frontend/product.html"
+    },
+    {
+      "source": "/brands",
+      "destination": "/frontend/brands.html"
+    },
+    {
+      "source": "/taroba",
+      "destination": "/frontend/taroba.html"
+    },
+    {
+      "source": "/catalogue",
+      "destination": "/frontend/catalogue.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/frontend/contact.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/frontend/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/frontend/terms.html"
+    },
+    {
       "source": "/:path*",
       "destination": "/frontend/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin(.*)",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+      ]
     }
   ]
 }

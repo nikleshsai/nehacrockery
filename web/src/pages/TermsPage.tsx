@@ -53,7 +53,7 @@ export default function TermsPage() {
               3. Pricing
             </h3>
             <p>
-              All pricing is provided on request only (enquire for price). Wholesale prices are subject to minimum order quantities and may vary. Prices are not binding until confirmed in writing by Neha Crockery House.
+              Prices displayed on product cards represent indicative MRP or reference pricing where available, while other items are listed as price on request. Wholesale, trade, and bulk pricing is subject to minimum order quantities and may vary. Final prices are not binding until confirmed in writing by Neha Crockery House upon enquiry.
             </p>
           </div>
           <div className="legal-block">

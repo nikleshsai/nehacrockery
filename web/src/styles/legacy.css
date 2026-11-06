@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════
    NEHA CROCKERY HOUSE — Premium Stylesheet
    Palette: Cream #FAF7F2 | Warm Greige #EDE6DA | Charcoal #3A3330
              Deep Navy #0D2240 | Muted Gold #C9A84C
@@ -499,11 +499,26 @@ address { font-style: normal; }
   font-weight: 600;
 }
 
-/* Desktop nav — hidden on ALL screen sizes (nav is hamburger-only) */
-.desktop-nav { display: none !important; }
+.desktop-nav-link:focus-visible,
+.mobile-nav-link:focus-visible,
+.mobile-toggle:focus-visible,
+.logo-link:focus-visible,
+.header-whatsapp-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 
-/* Hamburger always visible */
-/* (no media query needed — toggle is always shown) */
+/* Responsive Navigation Visibility:
+   - Desktop (≥992px): show horizontal .desktop-nav, hide .mobile-toggle and .mobile-menu
+   - Tablet/Mobile (<992px): hide .desktop-nav, show .mobile-toggle hamburger */
+@media (max-width: 991px) {
+  .desktop-nav { display: none !important; }
+}
+
+@media (min-width: 992px) {
+  .mobile-toggle,
+  .mobile-menu { display: none !important; }
+}
 
 /* Hide old nav classes */
 .main-nav { display: none !important; }

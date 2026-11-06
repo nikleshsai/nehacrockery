@@ -5,11 +5,11 @@ const CATEGORIES: Array<[string, string]> = [
   ['crockery', 'Crockery & Dinnerware'],
   ['cutlery', 'Cutlery'],
   ['glassware', 'Glassware & Bottles'],
-  ['melamineware', 'Melamineware'],
-  ['acrylicware', 'Acrylicware'],
   ['kitchenware', 'Kitchenware'],
-  ['hotelware', 'Hotelware & Institutional Supply'],
-  ['wooden-handicrafts', 'Wooden Handicrafts'],
+  ['hotelware', 'Hotelware & Institutional'],
+  ['cookware', 'Cookware'],
+  ['storage-containers', 'Storage & Containers'],
+  ['stainless-steel-items', 'Stainless Steel Items'],
 ];
 
 export function Footer() {
@@ -20,16 +20,16 @@ export function Footer() {
         <div className="container footer-top-inner">
           <div className="footer-brand">
             <div className="footer-logo">
-              <img src="/assets/images/logo.jpeg" alt="Neha Crockery House" className="footer-logo-img" />
+              <img src="/assets/images/logo.jpeg" alt="" className="footer-logo-img" />
               <div className="footer-logo-text">
-                <span className="footer-logo-name">Neha Crockery</span>
+                <span className="footer-logo-name">Neha Crockery</span>{' '}
                 <span className="footer-logo-sub">House</span>
               </div>
             </div>
             <address className="footer-address">
               <span>{c.address}</span>
               <br />
-              <a href={c.telHref} className="footer-link">
+              <a href={c.telHref} className="footer-link" title={`Call ${c.phoneDisplay}`}>
                 {c.phoneDisplay}
               </a>
               <br />

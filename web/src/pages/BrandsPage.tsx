@@ -80,12 +80,12 @@ export default function BrandsPage() {
             Contact us and we'll check availability or source it for you.
           </p>
           <div className="brands-enquiry-ctas">
-            <a href={c.wa("Hello, I am looking for products from a specific brand.")} className="btn-whatsapp" target="_blank" rel="noopener">
+            <a href={c.wa("Hello, I am looking for products from a specific brand.")} className="btn-whatsapp" target="_blank" rel="noopener noreferrer">
               WhatsApp Us
             </a>
             {' '}
-            <a href={c.telHref} className="btn-primary">
-              Call Now &#8594;
+            <a href={c.telHref} className="btn-primary" title={`Call ${c.phoneDisplay}`}>
+              Call {c.phoneDisplay} &#8594;
             </a>
           </div>
         </div>

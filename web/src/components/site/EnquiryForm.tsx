@@ -23,6 +23,11 @@ export function EnquiryForm({ source, idPrefix }: EnquiryFormProps) {
       alert('Please fill in Name, Phone and Message fields.');
       return;
     }
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 7 || digits.length > 15) {
+      alert('Please enter a valid phone or WhatsApp number (7 to 15 digits).');
+      return;
+    }
 
     const waText =
       'Hello Neha Crockery House,\n\n' +
@@ -132,6 +137,10 @@ export function EnquiryForm({ source, idPrefix }: EnquiryFormProps) {
             <option value="cutlery">Cutlery</option>
             <option value="glassware">Glassware &amp; Bottles</option>
             <option value="kitchenware">Kitchenware</option>
+            <option value="hotelware">Hotelware &amp; Institutional</option>
+            <option value="cookware">Cookware</option>
+            <option value="storage-containers">Storage &amp; Containers</option>
+            <option value="stainless-steel-items">Stainless Steel Items</option>
             <option value="taroba">Taroba Brand</option>
             <option value="other">Other / General</option>
           </select>

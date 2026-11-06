@@ -31,11 +31,13 @@ export function useApiData<T>(path: string | null): AsyncState<T> {
 }
 
 /** Load every active product (follows pagination, 100 per page). */
-export function useAllProducts(): AsyncState<Product[]> {
+export function useAllProducts(): AsyncState<Product[]> & { retry: () => void } {
   const [state, setState] = useState<AsyncState<Product[]>>({ data: null, loading: true, error: null });
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setState((s) => ({ ...s, loading: true, error: null }));
     (async () => {
       try {
         const base = '/products?active=true&pageSize=100&sortBy=name&sortOrder=asc';
@@ -56,9 +58,12 @@ export function useAllProducts(): AsyncState<Product[]> {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  return state;
+  return {
+    ...state,
+    retry: () => setAttempt((a) => a + 1),
+  };
 }
 
 export function useBrands(): AsyncState<Brand[]> {

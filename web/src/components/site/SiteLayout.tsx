@@ -31,7 +31,7 @@ export function SiteLayout() {
         id="float-whatsapp"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp"
+        aria-label="Chat with Neha Crockery House on WhatsApp"
       >
         <WhatsAppIcon size={26} />
       </a>

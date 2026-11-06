@@ -48,7 +48,7 @@ export default function CataloguePage() {
               </em>
             </h2>
             <p className="catalogue-card-desc">
-              Our catalogue includes all product categories: Crockery &amp; Dinnerware, Cutlery, Glassware &amp; Bottles, Melamineware, Acrylicware, Kitchenware and more. Including our own Taroba brand.
+              Our catalogue includes all 8 product categories: Crockery &amp; Dinnerware, Cutlery, Glassware &amp; Bottles, Kitchenware, Hotelware &amp; Institutional Supply, Cookware, Storage &amp; Containers, and Stainless Steel Items.
             </p>
             <div className="catalogue-meta">
               <span className="catalogue-meta-item">

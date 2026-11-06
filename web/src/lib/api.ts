@@ -39,12 +39,21 @@ export async function request<T>(path: string, opts: RequestOptions = {}): Promi
   }
   if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: opts.method ?? 'GET',
-    headers,
-    body,
-    signal: opts.signal,
-  });
+  const timeoutCtrl = new AbortController();
+  const timeoutId = setTimeout(() => timeoutCtrl.abort(), 12000);
+  const signal = opts.signal ?? timeoutCtrl.signal;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: opts.method ?? 'GET',
+      headers,
+      body,
+      signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (res.status === 204) {
     return { success: true, data: undefined as T };

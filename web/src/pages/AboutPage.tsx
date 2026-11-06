@@ -26,11 +26,11 @@ export default function AboutPage() {
       </section>
       <section className="about-section" id="about" aria-labelledby="about-heading">
         <div className="container about-inner">
-          <div className="about-img-col" aria-hidden="true">
+          <div className="about-img-col">
             <div className="about-img-backframe">
             </div>
             <div className="about-img-frame">
-              <img src="/assets/images/about_showroom.jpg" alt="Neha Crockery House showroom displaying premium crockery and dinnerware sets" className="about-img" loading="lazy" />
+              <img src="/assets/images/crockery.png" alt="Neha Crockery House showroom displaying premium crockery and dinnerware sets" className="about-img" loading="lazy" />
               <div className="about-img-gradient">
               </div>
               <div className="about-img-strip">

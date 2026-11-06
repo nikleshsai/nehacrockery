@@ -112,10 +112,10 @@ export default function PrivacyPage() {
           </div>
           <div className="legal-block">
             <h3>
-              5. Cookies
+              5. Cookies &amp; Local Browser Storage
             </h3>
             <p>
-              Google Analytics is not enabled on this website. We do not use advertising or tracking cookies. If we enable analytics in future, we will update this policy first. Embedded Google Maps may set its own cookies.
+              Google Analytics is not enabled on this website, and we do not use advertising or tracking cookies. We use functional browser storage (<code>localStorage</code> and <code>sessionStorage</code>) solely to remember your theme preference (<code>nch-theme</code>), items added to your enquiry cart (<code>nch_cart</code>), and cached public showroom contact settings (<code>nch_site_settings</code>). Embedded Google Maps may set its own cookies.
             </p>
           </div>
           <div className="legal-block">

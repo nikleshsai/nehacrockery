@@ -187,6 +187,19 @@
             cb(new Error('Invalid server response: ' + e.message), null);
             return;
           }
+          if (res.status === 401 || res.status === 403) {
+            sessionStorage.removeItem(TOKEN_KEY);
+            state.token = null;
+            state.user = null;
+            var loginScr = $('login-screen');
+            var adminApp = $('admin-app');
+            if (adminApp) adminApp.style.display = 'none';
+            if (loginScr) loginScr.style.display = '';
+            var errBox = $('login-error');
+            if (errBox) errBox.textContent = j.message || 'Session expired or unauthorized. Please sign in again.';
+            cb(new Error(j.message || 'Unauthorized (' + res.status + ')'), null);
+            return;
+          }
           if (res.status >= 400) {
             cb(new Error(j.message || 'Error ' + res.status), null);
           } else {
@@ -361,10 +374,10 @@
       if (window.innerWidth > 768) closeMobileSidebar();
     });
 
+    setupLogin();
     if (state.token) {
       showDashboard();
     } else {
-      setupLogin();
       // Ping backend health endpoint and update the status indicator on the login page
       pingBackendStatus();
     }

@@ -50,16 +50,6 @@ const CHIPS: CategoryChipDef[] = [
     ),
   },
   {
-    slug: 'melamineware',
-    label: 'Melamineware',
-    id: 'chip-melamineware',
-  },
-  {
-    slug: 'acrylicware',
-    label: 'Acrylicware',
-    id: 'chip-acrylicware',
-  },
-  {
     slug: 'kitchenware',
     label: 'Kitchenware',
     id: 'chip-kitchen',
@@ -75,9 +65,19 @@ const CHIPS: CategoryChipDef[] = [
     id: 'chip-hotelware',
   },
   {
-    slug: 'wooden-handicrafts',
-    label: 'Wooden Handicrafts',
-    id: 'chip-wooden',
+    slug: 'cookware',
+    label: 'Cookware',
+    id: 'chip-cookware',
+  },
+  {
+    slug: 'storage-containers',
+    label: 'Storage & Containers',
+    id: 'chip-storage',
+  },
+  {
+    slug: 'stainless-steel-items',
+    label: 'Stainless Steel',
+    id: 'chip-stainless',
   },
   {
     slug: 'new-arrivals',
@@ -92,6 +92,19 @@ const CHIPS: CategoryChipDef[] = [
   },
 ];
 
+function normalizeCategorySlug(raw: string): string {
+  const s = (raw || '').toLowerCase().trim();
+  const map: Record<string, string> = {
+    'crockery-dinnerware': 'crockery',
+    'crockery & dinnerware': 'crockery',
+    'glassware-bottles': 'glassware',
+    'glassware & bottles': 'glassware',
+    'hotelware-institutional-supply': 'hotelware',
+    'hotelware & institutional supply': 'hotelware',
+  };
+  return map[s] || s;
+}
+
 export default function ProductsPage() {
   const c = useContact();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -102,7 +115,7 @@ export default function ProductsPage() {
   const [sortOrder, setSortOrder] = useState('default');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: allProducts, loading, error } = useAllProducts();
+  const { data: allProducts, loading, error, retry } = useAllProducts();
 
   const selectCategory = (slug: string) => {
     setCurrentPage(1);
@@ -113,18 +126,27 @@ export default function ProductsPage() {
     setSearchParams(next, { replace: true });
   };
 
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSortOrder('default');
+    setCurrentPage(1);
+    setSearchParams({}, { replace: true });
+  };
+
   const filteredProducts = useMemo(() => {
     const list = allProducts ?? [];
     const term = searchTerm.toLowerCase().trim();
+    const normActiveCat = normalizeCategorySlug(activeCategory);
     const filtered = list.filter((p) => {
-      const cat = (p.category?.slug || p.category?.name || '').toLowerCase();
+      const rawCat = (p.category?.slug || p.category?.name || '').toLowerCase();
+      const cat = normalizeCategorySlug(rawCat);
       const matchCat =
         activeCategory === 'all' ||
         (activeCategory === 'new-arrivals'
           ? Boolean(p.isNewArrival)
-          : cat === activeCategory ||
-            cat.startsWith(`${activeCategory}-`) ||
-            cat.startsWith(activeCategory.replace('-', '')));
+          : cat === normActiveCat ||
+            rawCat === activeCategory.toLowerCase() ||
+            rawCat.startsWith(`${normActiveCat}-`));
 
       const brandName = (p.brand?.name || '').toLowerCase();
       const brandSlug = (p.brand?.slug || '').toLowerCase();
@@ -246,13 +268,17 @@ export default function ProductsPage() {
           </div>
 
           <div className="products-results-bar">
-            <p className="products-count" id="products-count">
+            <p className="products-count" id="products-count" aria-live="polite">
               {loading && !allProducts
                 ? 'Loading products…'
-                : `Showing ${Math.min(pageProducts.length, total)} of ${total} products`}
+                : error && !allProducts
+                  ? 'Unable to load products'
+                  : total === 0
+                    ? '0 products found'
+                    : `Showing ${Math.min(pageProducts.length, total)} of ${total} products`}
             </p>
             <a
-              href={c.wa('Hello, I want to enquire about wholesale pricing.')}
+              href={c.wa('Hello, I would like to enquire about wholesale pricing.')}
               className="btn-whatsapp btn-sm"
               target="_blank"
               rel="noopener noreferrer"
@@ -262,14 +288,30 @@ export default function ProductsPage() {
           </div>
 
           {error && !allProducts ? (
-            <div className="products-empty" id="products-empty" aria-live="polite">
+            <div className="products-empty" id="products-empty" role="alert" aria-live="polite">
               <div className="products-empty-icon">
                 <svg className="ui-icon ui-icon--lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
               </div>
-              <p className="products-empty-desc">Could not load products. Please try again later.</p>
+              <h3 className="products-empty-title">Could Not Load Products</h3>
+              <p className="products-empty-desc">
+                We encountered a temporary connection issue loading the catalogue. Please try again or reach us directly on WhatsApp.
+              </p>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+                <button type="button" className="btn-primary" id="products-retry-btn" onClick={retry}>
+                  Retry Loading
+                </button>
+                <a
+                  href={c.wa('Hello, I would like to enquire about your products.')}
+                  className="btn-whatsapp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Ask on WhatsApp &#8594;
+                </a>
+              </div>
             </div>
           ) : !loading && total === 0 ? (
             <div className="products-empty" id="products-empty" aria-live="polite">
@@ -287,14 +329,21 @@ export default function ProductsPage() {
                   ? 'We stock this category in our showroom. Enquire for the current range and availability.'
                   : 'Try adjusting your search or filter, or contact us for the full range.'}
               </p>
-              <a
-                href={c.wa('Hello, I am looking for a specific product.')}
-                className="btn-whatsapp"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Ask on WhatsApp &#8594;
-              </a>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+                {(activeCategory !== 'all' || activeBrand || searchTerm) && (
+                  <button type="button" className="btn-secondary" id="products-reset-btn" onClick={resetFilters}>
+                    Reset Filters
+                  </button>
+                )}
+                <a
+                  href={c.wa('Hello, I am looking for a specific product.')}
+                  className="btn-whatsapp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Ask on WhatsApp &#8594;
+                </a>
+              </div>
             </div>
           ) : (
             <div className="products-grid-full" id="products-main-grid" role="list" aria-live="polite" aria-label="Products list">
@@ -334,8 +383,8 @@ export default function ProductsPage() {
             >
               WhatsApp Enquiry
             </a>
-            <a href={c.telHref} className="btn-primary">
-              Call Now &#8594;
+            <a href={c.telHref} className="btn-primary" title={`Call ${c.phoneDisplay}`}>
+              Call {c.phoneDisplay} &#8594;
             </a>
           </div>
         </div>

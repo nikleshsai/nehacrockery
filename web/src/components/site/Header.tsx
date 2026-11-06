@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContact } from '@/lib/settings';
 import { WhatsAppIcon } from './WhatsAppIcon';
@@ -18,6 +18,7 @@ export function Header() {
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -29,15 +30,47 @@ export function Header() {
   // Close the mobile menu on navigation
   useEffect(() => setOpen(false), [pathname]);
 
+  // Keep `inert` attribute synchronized so hidden mobile links are removed from tab order
+  useEffect(() => {
+    const el = mobileMenuRef.current;
+    if (!el) return;
+    if (open) {
+      el.removeAttribute('inert');
+    } else {
+      el.setAttribute('inert', '');
+    }
+  }, [open]);
+
+  // Close the mobile menu on Escape or when resizing to desktop
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        setOpen(false);
+        document.getElementById('mobile-toggle')?.focus();
+      }
+    };
+    const onResize = () => {
+      if (window.innerWidth >= 992 && open) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [open]);
+
   const enquiry = 'Hello, I would like to enquire about your products.';
 
   return (
     <header className={`site-header${scrolled ? ' scrolled' : ''}`} id="site-header">
       <div className="header-inner container">
-        <Link to="/" className="logo-link" id="logo-link" aria-label="Neha Crockery House Home">
-          <img src="/assets/images/logo.jpeg" alt="Neha Crockery House" className="header-logo-img" />
+        <Link to="/" className="logo-link" id="logo-link">
+          <img src="/assets/images/logo.jpeg" alt="" className="header-logo-img" />
           <div className="logo-text">
-            <span className="logo-name">Neha Crockery</span>
+            <span className="logo-name">Neha Crockery</span>{' '}
             <span className="logo-tagline">House</span>
           </div>
         </Link>
@@ -66,7 +99,7 @@ export function Header() {
             id="header-whatsapp"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="WhatsApp"
+            aria-label="Chat with Neha Crockery House on WhatsApp"
           >
             <WhatsAppIcon />
             <span>WhatsApp</span>
@@ -87,7 +120,12 @@ export function Header() {
         </div>
       </div>
 
-      <div className={`mobile-menu${open ? ' open' : ''}`} id="mobile-menu" aria-hidden={!open}>
+      <div
+        ref={mobileMenuRef}
+        className={`mobile-menu${open ? ' open' : ''}`}
+        id="mobile-menu"
+        aria-hidden={!open}
+      >
         <nav aria-label="Mobile navigation">
           <ul className="mobile-nav-list" role="list">
             {NAV.map((n) => (
