@@ -2072,7 +2072,7 @@
         var thumb;
         if (item.mediaType === 'video') {
           thumb = item.thumbnailUrl
-            ? '<img src="' + esc(item.thumbnailUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.src=\'data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\'/%3E\';this.style.background=\'#1a2b4a\'">'
+            ? '<img src="' + esc(item.thumbnailUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.removeAttribute(\'src\');this.style.background=\'#1a2b4a\'">'
             : '<div style="width:100%;height:140px;background:linear-gradient(135deg,#1a2b4a,#3a5a8a);display:flex;align-items:center;justify-content:center;border-radius:8px 8px 0 0;"><span style="font-size:2.5rem;color:rgba(255,255,255,.8);">\u25b6</span></div>';
         } else {
           thumb = '<img src="' + esc(item.mediaUrl) + '" style="width:100%;height:140px;object-fit:cover;border-radius:8px 8px 0 0;" loading="lazy" onerror="this.style.background=\'#f1f5f9\';this.alt=\'Image not found\';this.style.display=\'flex\';" />';
