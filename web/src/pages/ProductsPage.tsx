@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Seo } from '@/components/Seo';
 import { ProductCard } from '@/components/site/ProductCard';
@@ -20,7 +20,7 @@ const CHIPS: CategoryChipDef[] = [
   { slug: 'all', label: 'All Products', id: 'chip-all' },
   {
     slug: 'crockery',
-    label: 'Crockery',
+    label: 'Crockery & Dinnerware',
     id: 'chip-crockery',
     icon: (
       <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -41,7 +41,7 @@ const CHIPS: CategoryChipDef[] = [
   },
   {
     slug: 'glassware',
-    label: 'Glassware',
+    label: 'Glassware & Bottles',
     id: 'chip-glassware',
     icon: (
       <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -56,37 +56,6 @@ const CHIPS: CategoryChipDef[] = [
     icon: (
       <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M5 9h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM3 9h2M19 9h2M9 6a3 3 0 0 1 6 0" />
-      </svg>
-    ),
-  },
-  {
-    slug: 'hotelware',
-    label: 'Hotelware',
-    id: 'chip-hotelware',
-  },
-  {
-    slug: 'cookware',
-    label: 'Cookware',
-    id: 'chip-cookware',
-  },
-  {
-    slug: 'storage-containers',
-    label: 'Storage & Containers',
-    id: 'chip-storage',
-  },
-  {
-    slug: 'stainless-steel-items',
-    label: 'Stainless Steel',
-    id: 'chip-stainless',
-  },
-  {
-    slug: 'new-arrivals',
-    label: 'New Arrivals',
-    id: 'chip-new',
-    isNew: true,
-    icon: (
-      <svg className="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
       </svg>
     ),
   },
@@ -135,7 +104,21 @@ export default function ProductsPage() {
     };
 
     const activeCats = (apiCategories ?? [])
-      .filter((cat) => cat && cat.isActive !== false)
+      .filter((cat) => {
+        if (!cat || cat.isActive === false) return false;
+        const rawSlug = (cat.slug || '').toLowerCase().trim();
+        const normSlug = normalizeCategorySlug(rawSlug);
+        if (allProducts && allProducts.length > 0) {
+          return allProducts.some((p) => {
+            const pRaw = (p.category?.slug || '').toLowerCase().trim();
+            return normalizeCategorySlug(pRaw) === normSlug || pRaw === rawSlug;
+          });
+        }
+        if (typeof cat._count?.products === 'number') {
+          return cat._count.products > 0;
+        }
+        return true;
+      })
       .slice()
       .sort((a, b) => {
         const sa = typeof a.sortOrder === 'number' ? a.sortOrder : 99;
@@ -172,18 +155,33 @@ export default function ProductsPage() {
       });
     });
 
-    if (!hasNew) {
+    const anyNewArrivalProduct = (allProducts ?? []).some((p) => Boolean(p.isNewArrival));
+    if (!hasNew && anyNewArrivalProduct) {
       list.push({
         slug: 'new-arrivals',
         label: 'New Arrivals',
         id: 'chip-new',
         isNew: true,
-        icon: iconBySlug.get('new-arrivals'),
       });
     }
 
     return { dynamicChips: list, categoryOrderMap: orderMap };
-  }, [apiCategories]);
+  }, [apiCategories, allProducts]);
+
+  const effectiveCategory = useMemo(() => {
+    const norm = normalizeCategorySlug(activeCategory);
+    if (norm === 'all') return 'all';
+    const exists = dynamicChips.some((ch) => ch.slug === norm || ch.slug === activeCategory);
+    return exists ? norm : 'all';
+  }, [activeCategory, dynamicChips]);
+
+  useEffect(() => {
+    if (activeCategory !== 'all' && effectiveCategory === 'all') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('category');
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeCategory, effectiveCategory, searchParams, setSearchParams]);
 
   const selectCategory = (slug: string) => {
     setCurrentPage(1);
@@ -204,16 +202,16 @@ export default function ProductsPage() {
   const filteredProducts = useMemo(() => {
     const list = allProducts ?? [];
     const term = searchTerm.toLowerCase().trim();
-    const normActiveCat = normalizeCategorySlug(activeCategory);
+    const normActiveCat = normalizeCategorySlug(effectiveCategory);
     const filtered = list.filter((p) => {
       const rawCat = (p.category?.slug || p.category?.name || '').toLowerCase();
       const cat = normalizeCategorySlug(rawCat);
       const matchCat =
-        activeCategory === 'all' ||
-        (activeCategory === 'new-arrivals'
+        effectiveCategory === 'all' ||
+        (effectiveCategory === 'new-arrivals'
           ? Boolean(p.isNewArrival)
           : cat === normActiveCat ||
-            rawCat === activeCategory.toLowerCase() ||
+            rawCat === effectiveCategory.toLowerCase() ||
             rawCat.startsWith(`${normActiveCat}-`));
 
       const brandName = (p.brand?.name || '').toLowerCase().trim();
@@ -275,7 +273,7 @@ export default function ProductsPage() {
       });
     }
     return sorted;
-  }, [allProducts, activeCategory, activeBrand, searchTerm, sortOrder, categoryOrderMap]);
+  }, [allProducts, effectiveCategory, activeBrand, searchTerm, sortOrder, categoryOrderMap]);
 
   const total = filteredProducts.length;
   const pageProducts = filteredProducts.slice(0, currentPage * PAGE_SIZE);
@@ -344,7 +342,7 @@ export default function ProductsPage() {
 
           <div className="category-chips" id="category-chips" role="tablist" aria-label="Filter by category">
             {dynamicChips.map((chip) => {
-              const selected = normalizeCategorySlug(activeCategory) === chip.slug || activeCategory === chip.slug;
+              const selected = effectiveCategory === chip.slug;
               return (
                 <button
                   key={chip.slug}

@@ -30,7 +30,18 @@ export default function AboutPage() {
             <div className="about-img-backframe">
             </div>
             <div className="about-img-frame">
-              <img src="/assets/images/crockery.png" alt="Neha Crockery House showroom displaying premium crockery and dinnerware sets" className="about-img" loading="lazy" />
+              <img
+                src="/assets/images/crockery.png"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (!img.src.endsWith('/assets/images/about_showroom.jpg')) {
+                    img.src = '/assets/images/about_showroom.jpg';
+                  }
+                }}
+                alt="Neha Crockery House showroom displaying premium crockery and dinnerware sets"
+                className="about-img"
+                loading="lazy"
+              />
               <div className="about-img-gradient">
               </div>
               <div className="about-img-strip">

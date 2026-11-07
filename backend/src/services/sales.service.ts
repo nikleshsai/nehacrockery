@@ -382,9 +382,14 @@ export async function completeOnlineOrder(input: PublicOrderInput) {
 
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
 
+  const isCashOrder = paymentMethod.toLowerCase().includes('cash');
+  const paymentStatusLabel = isCashOrder
+    ? `PAY BY CASH AT STORE PICKUP (${paymentMethod})`
+    : `PAID ONLINE (${paymentMethod})`;
+
   const notes = [
     `Fulfillment: Store Pickup Only (No Delivery Option)`,
-    `Payment Status: PAID ONLINE (${paymentMethod})`,
+    `Payment Status: ${paymentStatusLabel}`,
     `Payment Ref: ${paymentRef}`,
     input.razorpayOrderId ? `Razorpay Order: ${input.razorpayOrderId}` : null,
   ]
@@ -424,10 +429,10 @@ export async function completeOnlineOrder(input: PublicOrderInput) {
         source: 'website-online-order',
         message: [
           `BILL NO: ${sale.saleNumber}`,
-          `PAYMENT: PAID ONLINE (${paymentMethod}) — Ref: ${paymentRef}`,
+          `PAYMENT: ${paymentStatusLabel} — Ref: ${paymentRef}`,
           `FULFILLMENT: Store Pickup Only (No Delivery Option)`,
           ...summaryLines,
-          `TOTAL PAID: ₹${totalAmount.toFixed(2)}`,
+          `${isCashOrder ? 'TOTAL PAYABLE (CASH AT PICKUP)' : 'TOTAL PAID'}: ₹${totalAmount.toFixed(2)}`,
         ].join('\n'),
       },
     });

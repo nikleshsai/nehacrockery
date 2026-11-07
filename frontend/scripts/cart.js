@@ -124,6 +124,8 @@
     '.nch-ft input{width:100%;box-sizing:border-box;margin-bottom:8px;padding:9px 10px;border:1px solid #d9d2c3;border-radius:6px;font:13px Montserrat,sans-serif;background:#fff}' +
     '.nch-go{width:100%;padding:12px;border:0;border-radius:6px;background:#1a2744;color:#fff;font:600 13px Montserrat,sans-serif;cursor:pointer;transition:background .2s}' +
     '.nch-go:hover{background:#263861}.nch-go[disabled]{opacity:.6;cursor:not-allowed}' +
+    '.nch-cash-btn{width:100%;margin-top:8px;padding:11px 12px;border:1.5px solid #c8a84b;border-radius:6px;background:#fff9eb;color:#1a2744;font:600 13px Montserrat,sans-serif;cursor:pointer;transition:all .2s}' +
+    '.nch-cash-btn:hover{background:#c8a84b;color:#fff}.nch-cash-btn[disabled]{opacity:.6;cursor:not-allowed}' +
     '.nch-note{font-size:11px;color:#666;margin:8px 0 0;text-align:center}' +
     '.nch-empty{text-align:center;color:#777;padding:40px 0;font-size:14px}' +
     '.nch-pay-modal{position:fixed;inset:0;background:rgba(13,34,64,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Montserrat,sans-serif}' +
@@ -207,8 +209,9 @@
       '<input id="nch-phone" placeholder="Phone / WhatsApp Number *" inputmode="tel" autocomplete="tel">' +
       '<input id="nch-email" placeholder="Email Address (optional)" type="email" autocomplete="email">' +
       '<input id="nch-company" placeholder="Business / Shop Name (optional)" autocomplete="organization">' +
-      '<button class="nch-go" id="nch-go">Pay Online &amp; Generate Bill \u2192</button>' +
-      '<p class="nch-note">Secure Online Payment (UPI / Card / NetBanking). Instant unique Bill generated for Store Pickup.</p>';
+      '<button class="nch-go" id="nch-go">\ud83d\udcb3 Pay Online &amp; Generate Bill \u2192</button>' +
+      '<button class="nch-cash-btn" id="nch-cash-go">\ud83d\udcb5 Pay by Cash (at Store Pickup) \u2192</button>' +
+      '<p class="nch-note">Pay Online (UPI / Card / NetBanking) or Pay by Cash at Showroom Pickup. Instant unique Bill generated.</p>';
   }
 
   window.addEventListener('nch:settings-updated', function () {
@@ -249,10 +252,16 @@
         '</tr>';
     }).join('');
 
+    var isCash = String(bill.paymentMethod || '').toLowerCase().indexOf('cash') !== -1;
+    var payStatusBadge = isCash
+      ? 'PAY BY CASH AT STORE PICKUP'
+      : ('PAID ONLINE (' + esc(bill.paymentMethod) + ')');
+    var totalLabel = isCash ? 'Grand Total Payable (Cash at Pickup):' : 'Grand Total Paid:';
+
     var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ' + esc(bill.billNumber) + ' - ' + esc(bill.businessName) + '</title>' +
       '<style>body{font-family:Arial,sans-serif;color:#1a2744;margin:28px;line-height:1.5}' +
       '.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a2744;padding-bottom:14px;margin-bottom:16px}' +
-      '.badge{display:inline-block;padding:4px 10px;border-radius:4px;background:#e6f4ea;color:#137333;font-weight:700;font-size:12px}' +
+      '.badge{display:inline-block;padding:4px 10px;border-radius:4px;background:' + (isCash ? '#fff8e6;color:#8a640f;border:1px solid #e6c97a' : '#e6f4ea;color:#137333') + ';font-weight:700;font-size:12px}' +
       '.pickup{background:#fff8e6;border:1px solid #e6c97a;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:13px}' +
       'table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#1a2744;color:#fff;padding:8px;text-align:left;font-size:13px}' +
       '@media print{.no-print{display:none}}</style></head><body>' +
@@ -262,14 +271,14 @@
       '<div style="text-align:right;"><div style="font-size:11px;color:#666;text-transform:uppercase;">Original Customer &amp; Admin Bill</div>' +
       '<div style="font-size:18px;font-weight:700;color:#1a2744;margin:2px 0;">' + esc(bill.billNumber) + '</div>' +
       '<div style="font-size:12px;color:#555;">Date: ' + esc(bill.dateStr) + '</div>' +
-      '<div class="badge" style="margin-top:4px;">PAID ONLINE (' + esc(bill.paymentMethod) + ')</div></div></div>' +
+      '<div class="badge" style="margin-top:4px;">' + payStatusBadge + '</div></div></div>' +
       '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;">' +
       '<div><strong>Billed To:</strong><br>' + esc(bill.customerName) + (bill.companyName ? ' (' + esc(bill.companyName) + ')' : '') + '<br>Phone: ' + esc(bill.phone) + (bill.email ? '<br>Email: ' + esc(bill.email) : '') + '</div>' +
       '<div style="text-align:right;"><strong>Payment Ref:</strong> ' + esc(bill.paymentRef) + '<br><strong>Fulfillment:</strong> Store Pickup Only (No Delivery)</div></div>' +
-      '<div class="pickup"><strong>\ud83c\udfec STORE PICKUP ONLY (NO DELIVERY OPTION):</strong> Please present Bill No. <strong>' + esc(bill.billNumber) + '</strong> at our showroom (' + esc(bill.pickupAddress) + ') to collect your order.</div>' +
+      '<div class="pickup"><strong>\ud83c\udfec STORE PICKUP ONLY (NO DELIVERY OPTION):</strong> Please present Bill No. <strong>' + esc(bill.billNumber) + '</strong> at our showroom (' + esc(bill.pickupAddress) + ')' + (isCash ? ' and pay by Cash at pickup' : '') + ' to collect your order.</div>' +
       '<table><thead><tr><th>#</th><th>Product Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr></thead>' +
       '<tbody>' + itemsRows + '</tbody>' +
-      '<tfoot><tr><td colspan="4" style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">Grand Total Paid:</td><td style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">' + inr(bill.totalAmount) + '</td></tr></tfoot></table>' +
+      '<tfoot><tr><td colspan="4" style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">' + totalLabel + '</td><td style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">' + inr(bill.totalAmount) + '</td></tr></tfoot></table>' +
       '<p style="margin-top:24px;font-size:12px;color:#666;text-align:center;">Thank you for shopping with ' + esc(bill.businessName) + '! This unique Bill Number (' + esc(bill.billNumber) + ') is recorded in our Admin Sales ledger.</p>' +
       '</body></html>';
     win.document.open();
@@ -284,18 +293,23 @@
     badge.textContent = '0';
     ft.innerHTML = '';
 
+    var isCash = String(bill.paymentMethod || '').toLowerCase().indexOf('cash') !== -1;
+
     var waSummary = [
       'Hello ' + bill.businessName + ',',
-      'My Online Payment is completed for Store Pickup.',
+      isCash
+        ? 'I have generated a Store Pickup Bill (Pay by Cash at Showroom).'
+        : 'My Online Payment is completed for Store Pickup.',
       'Unique Bill No: ' + bill.billNumber,
-      'Payment Ref: ' + bill.paymentRef + ' (' + bill.paymentMethod + ')',
+      'Payment Mode: ' + (isCash ? 'Pay by Cash at Store Pickup' : ('Paid Online (' + bill.paymentMethod + ')')),
+      'Ref: ' + bill.paymentRef,
       'Customer: ' + bill.customerName + ' (' + bill.phone + ')',
       'Items:',
     ].concat(
       bill.items.map(function (it, i) {
         return (i + 1) + '. ' + it.productName + (it.productCode ? ' [' + it.productCode + ']' : '') + ' x ' + it.quantity + ' = ' + inr(it.quantity * it.unitPrice);
       }),
-      ['Total Paid: ' + inr(bill.totalAmount), 'Fulfillment: Store Pickup Only (No Delivery)']
+      [(isCash ? 'Total Payable (Cash at Pickup): ' : 'Total Paid: ') + inr(bill.totalAmount), 'Fulfillment: Store Pickup Only (No Delivery)']
     ).join('\n');
 
     var waUrl = 'https://wa.me/' + getWaNumber() + '?text=' + encodeURIComponent(waSummary);
@@ -303,14 +317,14 @@
     bd.innerHTML =
       '<div class="nch-bill-box">' +
       '<div style="text-align:center;border-bottom:1px dashed #d9d2c3;padding-bottom:10px;margin-bottom:10px;">' +
-      '<div style="font-size:11px;color:#137333;font-weight:700;text-transform:uppercase;">\u2705 Online Payment Successful</div>' +
+      '<div style="font-size:11px;color:' + (isCash ? '#8a640f' : '#137333') + ';font-weight:700;text-transform:uppercase;">\u2705 ' + (isCash ? 'Store Pickup Bill Generated (Pay by Cash)' : 'Online Payment Successful') + '</div>' +
       '<h3 style="margin:4px 0;font-family:\'Cormorant Garamond\',serif;font-size:22px;">' + esc(bill.businessName) + ' \u2014 Official Bill</h3>' +
       '<div style="background:#1a2744;color:#fff;display:inline-block;padding:4px 12px;border-radius:6px;font-weight:700;font-size:13px;letter-spacing:.5px;margin-top:4px;">Bill No: ' + esc(bill.billNumber) + '</div>' +
       '<div style="font-size:11px;color:#666;margin-top:4px;">' + esc(bill.dateStr) + ' | Ref: ' + esc(bill.paymentRef) + '</div>' +
       '</div>' +
       '<div style="font-size:12px;margin-bottom:8px;">' +
       '<div><strong>Customer:</strong> ' + esc(bill.customerName) + ' (' + esc(bill.phone) + ')</div>' +
-      '<div><strong>Payment:</strong> PAID ONLINE (' + esc(bill.paymentMethod) + ')</div>' +
+      '<div><strong>Payment:</strong> ' + (isCash ? 'PAY BY CASH AT STORE PICKUP' : ('PAID ONLINE (' + esc(bill.paymentMethod) + ')')) + '</div>' +
       '<div style="margin-top:6px;padding:7px 9px;background:#fff8e6;border:1px solid #e6c97a;border-radius:6px;">' +
       '<strong>\ud83c\udfec Store Pickup Only (No Delivery):</strong><br>' + esc(bill.pickupAddress) +
       '</div>' +
@@ -322,7 +336,7 @@
         return '<tr><td>' + esc(it.productName) + '</td><td>' + esc(it.quantity) + '</td><td>' + inr(it.quantity * it.unitPrice) + '</td></tr>';
       }).join('') +
       '</tbody>' +
-      '<tfoot><tr><th colspan="2">Total Paid</th><th>' + inr(bill.totalAmount) + '</th></tr></tfoot>' +
+      '<tfoot><tr><th colspan="2">' + (isCash ? 'Total Payable (Cash)' : 'Total Paid') + '</th><th>' + inr(bill.totalAmount) + '</th></tr></tfoot>' +
       '</table>' +
       '<div class="nch-bill-actions">' +
       '<button type="button" id="nch-print-bill-btn" style="background:#1a2744;color:#fff;">\ud83d\udda8\ufe0f Print / Download Bill</button>' +
@@ -501,7 +515,8 @@
   }
 
   ft.addEventListener('click', function (e) {
-    if (e.target.id !== 'nch-go') return;
+    if (e.target.id !== 'nch-go' && e.target.id !== 'nch-cash-go') return;
+    var isCashOrder = e.target.id === 'nch-cash-go';
     var name = (ft.querySelector('#nch-name') || {}).value.trim();
     var phone = (ft.querySelector('#nch-phone') || {}).value.trim();
     var email = (ft.querySelector('#nch-email') || {}).value.trim();
@@ -520,6 +535,25 @@
         unitPrice: Number(c.price) || 0
       };
     });
+
+    if (isCashOrder) {
+      var cashBtn = e.target;
+      cashBtn.disabled = true;
+      cashBtn.textContent = 'Generating Cash Pickup Bill…';
+      var cashRef = 'CASH-' + Date.now().toString(36).toUpperCase();
+      finalizeOrderOnBackend({
+        customerName: name,
+        companyName: company || null,
+        phone: phone,
+        email: email || null,
+        items: itemsPayload,
+        paymentMethod: 'Cash at Store Pickup',
+        transactionRef: cashRef
+      }, function (bill) {
+        showGeneratedBillInDrawer(bill);
+      });
+      return;
+    }
 
     var goBtn = e.target;
     goBtn.disabled = true;

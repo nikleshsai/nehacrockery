@@ -695,6 +695,8 @@
 
     var countEl = document.getElementById('products-count');
     var loadMoreWrap = document.getElementById('products-loadmore-wrap');
+    var isProductsLoaded = false;
+    var CATEGORIES_CACHE_KEY = 'nch_categories_cache_v2';
 
     // Read URL params
     var params = new URLSearchParams(window.location.search);
@@ -703,14 +705,32 @@
     if (urlCat) activeCategory = normalizeCategorySlug(urlCat);
     if (urlBrand) activeBrand = urlBrand;
 
-    // Set active chip from URL param
-    if (urlCat || urlBrand) {
-      document.querySelectorAll('.category-chip').forEach(function (chip) {
-        var isMatch = chip.dataset.category === activeCategory;
+    // If URL has a category that is not present in the static/active chips, reset to 'all' immediately on refresh
+    if (activeCategory !== 'all') {
+      var initialChipMatch = Array.prototype.some.call(
+        document.querySelectorAll('#category-chips .category-chip'),
+        function (chip) { return chip.dataset.category === activeCategory; }
+      );
+      if (!initialChipMatch) {
+        activeCategory = 'all';
+        try {
+          var cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('category');
+          window.history.replaceState({}, '', cleanUrl.toString());
+        } catch (e) {}
+      }
+    }
+
+    function syncActiveChipSelection() {
+      document.querySelectorAll('#category-chips .category-chip').forEach(function (chip) {
+        var isMatch = chip.dataset.category === activeCategory || (chip.dataset.rawSlug && chip.dataset.rawSlug === activeCategory);
         chip.classList.toggle('active', isMatch);
         chip.setAttribute('aria-selected', isMatch ? 'true' : 'false');
       });
     }
+
+    // Set active chip from URL param
+    syncActiveChipSelection();
 
     function renderLoadingSkeletons() {
       if (countEl) countEl.textContent = 'Loading products\u2026';
@@ -769,12 +789,32 @@
       return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
     }
 
-    function renderDynamicCategories(categories) {
-      var chipsWrap = document.getElementById('category-chips');
-      if (!chipsWrap || !Array.isArray(categories) || categories.length === 0) return;
+    var loadedCategories = [];
 
-      var activeCats = categories
-        .filter(function (c) { return c && c.isActive !== false; })
+    function renderDynamicCategories(categories) {
+      if (Array.isArray(categories) && categories.length > 0) {
+        loadedCategories = categories;
+      }
+      var sourceCats = loadedCategories;
+      var chipsWrap = document.getElementById('category-chips');
+      if (!chipsWrap || !Array.isArray(sourceCats) || sourceCats.length === 0) return;
+
+      // Only show active categories that actually have products (hide empty 0-product categories)
+      var activeCats = sourceCats
+        .filter(function (c) {
+          if (!c || c.isActive === false) return false;
+          var rawSlug = String(c.slug || '').toLowerCase().trim();
+          var normSlug = normalizeCategorySlug(rawSlug);
+          if (allProducts.length > 0) {
+            return allProducts.some(function (p) {
+              return p.category === normSlug || p.rawCategory === rawSlug;
+            });
+          }
+          if (c._count && typeof c._count.products === 'number') {
+            return c._count.products > 0;
+          }
+          return true;
+        })
         .slice()
         .sort(function (a, b) {
           var sa = typeof a.sortOrder === 'number' ? a.sortOrder : 99;
@@ -810,13 +850,35 @@
         });
       }
 
-      var hasNewArrivals = false;
+      // If URL had an empty/removed category selected, reset to 'all' so user never sees "0 products found"
+      if (activeCategory !== 'all') {
+        var existsInActive = activeCats.some(function (c) {
+          var rawSlug = String(c.slug || '').toLowerCase().trim();
+          var normSlug = normalizeCategorySlug(rawSlug);
+          return activeCategory === normSlug || activeCategory === rawSlug;
+        });
+        var hasNewArrivalProducts = activeCategory === 'new-arrivals' && allProducts.some(function (p) {
+          return (p.tags || []).includes('new_arrival');
+        });
+        if (!existsInActive && !hasNewArrivalProducts) {
+          activeCategory = 'all';
+          try {
+            var cleanCatUrl = new URL(window.location.href);
+            cleanCatUrl.searchParams.delete('category');
+            window.history.replaceState({}, '', cleanCatUrl.toString());
+          } catch (e) {}
+        }
+      }
+
+      var hasNewArrivalsChip = false;
+      var signatureParts = ['all'];
       var html = '<button class="category-chip' + (activeCategory === 'all' ? ' active' : '') + '" data-category="all" role="tab" aria-selected="' + (activeCategory === 'all' ? 'true' : 'false') + '" id="chip-all">All Products</button>';
 
       activeCats.forEach(function (c) {
         var rawSlug = String(c.slug || '').toLowerCase().trim();
         var normSlug = normalizeCategorySlug(rawSlug);
-        if (normSlug === 'new-arrivals') hasNewArrivals = true;
+        if (normSlug === 'new-arrivals') hasNewArrivalsChip = true;
+        signatureParts.push(normSlug + ':' + (c.name || ''));
         var isSelected = activeCategory === normSlug || activeCategory === rawSlug;
         var extraClass = normSlug === 'new-arrivals' ? ' category-chip--new' : '';
         html += '<button class="category-chip' + extraClass + (isSelected ? ' active' : '') + '" data-category="' + escHtml(normSlug) + '" data-raw-slug="' + escHtml(rawSlug) + '" role="tab" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
@@ -825,15 +887,38 @@
         '</button>';
       });
 
-      if (!hasNewArrivals) {
+      // Only show New Arrivals chip if there is at least 1 product marked as New Arrival
+      var anyNewArrivalProduct = allProducts.some(function (p) {
+        return (p.tags || []).includes('new_arrival');
+      });
+      if (!hasNewArrivalsChip && anyNewArrivalProduct) {
+        signatureParts.push('new-arrivals:New Arrivals');
         var isNewSel = activeCategory === 'new-arrivals';
         html += '<button class="category-chip category-chip--new' + (isNewSel ? ' active' : '') + '" data-category="new-arrivals" role="tab" aria-selected="' + (isNewSel ? 'true' : 'false') + '" id="chip-new">' +
           getCategoryIconSvg('new-arrivals') +
           'New Arrivals</button>';
       }
 
-      chipsWrap.innerHTML = html;
-      applyFiltersAndRender();
+      // Compute existing DOM signature so we never recreate #category-chips unnecessarily on refresh
+      var currentDomSig = Array.prototype.map.call(
+        chipsWrap.querySelectorAll('.category-chip'),
+        function (btn) {
+          var slug = btn.dataset.category || '';
+          if (slug === 'all') return 'all';
+          return slug + ':' + (btn.textContent || '').trim();
+        }
+      ).join('|');
+      var nextSig = signatureParts.join('|');
+
+      if (currentDomSig !== nextSig) {
+        chipsWrap.innerHTML = html;
+      } else {
+        syncActiveChipSelection();
+      }
+
+      if (isProductsLoaded) {
+        applyFiltersAndRender();
+      }
     }
 
     function loadRemainingPages(startPage, totalPages, pageSize) {
@@ -842,23 +927,40 @@
       apiFetch('/products?active=true&pageSize=' + ps + '&sortBy=name&sortOrder=asc&page=' + startPage, function(err, data) {
         if (!err && data && Array.isArray(data.data)) {
           allProducts = allProducts.concat(data.data.map(mapApiProduct));
-          applyFiltersAndRender();
+          if (loadedCategories.length > 0) renderDynamicCategories(loadedCategories);
+          else applyFiltersAndRender();
           loadRemainingPages(startPage + 1, totalPages, ps);
         }
       });
     }
 
     function loadInitialProducts() {
+      // Restore cached categories immediately so refresh has zero filter flicker
+      try {
+        var cachedCatsRaw = sessionStorage.getItem(CATEGORIES_CACHE_KEY);
+        if (cachedCatsRaw) {
+          var parsedCats = JSON.parse(cachedCatsRaw);
+          if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+            renderDynamicCategories(parsedCats);
+          }
+        }
+      } catch (e) {}
+
       renderLoadingSkeletons();
       apiFetch('/categories', function (catErr, catData) {
         if (!catErr && catData && Array.isArray(catData.data)) {
+          try {
+            sessionStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(catData.data));
+          } catch (e) {}
           renderDynamicCategories(catData.data);
         }
       });
       apiFetch('/products?active=true&pageSize=500&sortBy=name&sortOrder=asc&page=1', function(apiErr, apiData) {
         if (!apiErr && apiData && Array.isArray(apiData.data)) {
+          isProductsLoaded = true;
           allProducts = apiData.data.map(mapApiProduct);
-          applyFiltersAndRender();
+          if (loadedCategories.length > 0) renderDynamicCategories(loadedCategories);
+          else applyFiltersAndRender();
           var totalPages = (apiData.pagination && apiData.pagination.totalPages) || 1;
           var actualPageSize = (apiData.pagination && apiData.pagination.pageSize) || 500;
           if (totalPages > 1) {
