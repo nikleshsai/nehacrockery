@@ -22,12 +22,36 @@ vi.mock('../src/config/supabase', () => ({
   getSupabaseClient: () => ({
     auth: {
       getUser: async (token: string) => {
+        const unverifiedMatch = /^unverified-token:(.+)$/.exec(token ?? '');
+        if (unverifiedMatch) {
+          const email = unverifiedMatch[1];
+          return {
+            data: {
+              user: {
+                id: `auth-unverified-${email}`,
+                email,
+                email_confirmed_at: null,
+              },
+            },
+            error: null,
+          };
+        }
+
         const match = /^test-token:(.+)$/.exec(token ?? '');
         if (!match) {
           return { data: { user: null }, error: { message: 'invalid JWT' } };
         }
         const email = match[1];
-        return { data: { user: { id: `auth-${email}`, email } }, error: null };
+        return {
+          data: {
+            user: {
+              id: `auth-${email}`,
+              email,
+              email_confirmed_at: '2026-01-01T00:00:00.000Z',
+            },
+          },
+          error: null,
+        };
       },
     },
     storage: {

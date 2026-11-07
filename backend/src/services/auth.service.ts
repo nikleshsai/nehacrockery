@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from '@supabase/supabase-js';
 import { UserRole } from '@prisma/client';
-import prisma, { ensureDatabaseSchema } from '../config/database';
+import prisma from '../config/database';
 import { config } from '../config/env';
 import { AppError } from '../utils/AppError';
 import type { LoginInput } from '../validators/auth.validator';
@@ -26,52 +26,67 @@ const baseUserSelect = {
 
 /**
  * Resolves a verified Supabase Auth user (`authUserId`, `authEmail`) to a local
- * admin user record, linking `auth_id` on first login and recovering gracefully
- * if the `users.auth_id` column has not yet been migrated.
+ * admin user record.
+ *
+ * Security hardening:
+ * - H1: Only links an unlinked admin record by email when `emailVerified === true`.
+ * - M5: Uses an atomic conditional `updateMany({ where: { id, authId: null } })`
+ *       to prevent concurrent email-linking race conditions.
+ * - M7: Does not run DDL at request time; schema changes live in Prisma migrations.
  */
 export async function resolveOrLinkAdminUser(
   authUserId: string,
   authEmail: string,
+  emailVerified = false,
 ): Promise<ResolvedAdminUser | null> {
-  let user: ResolvedAdminUser | null = null;
+  const existingLinked = await prisma.user.findUnique({
+    where: { authId: authUserId },
+    select: baseUserSelect,
+  });
 
+  if (existingLinked) {
+    return existingLinked;
+  }
+
+  // H1: Never link an unlinked admin account unless the Supabase email is verified
+  if (!emailVerified) {
+    return null;
+  }
+
+  const byEmail = await prisma.user.findFirst({
+    where: {
+      email: { equals: authEmail, mode: 'insensitive' },
+      authId: null,
+    },
+    select: baseUserSelect,
+  });
+
+  if (!byEmail) {
+    return null;
+  }
+
+  // M5: Atomic conditional link — only succeeds if authId is still null
   try {
-    user = await prisma.user.findUnique({
+    const linked = await prisma.user.updateMany({
+      where: { id: byEmail.id, authId: null },
+      data: { authId: authUserId, lastLogin: new Date() },
+    });
+
+    if (linked.count === 1) {
+      return byEmail;
+    }
+
+    // Another concurrent request linked this record; check if it was linked to this same authUserId
+    return await prisma.user.findUnique({
       where: { authId: authUserId },
       select: baseUserSelect,
     });
-  } catch (err) {
-    // If `users.auth_id` column does not exist yet, attempt to add it and fall back to email lookup
-    await ensureDatabaseSchema();
-  }
-
-  if (!user) {
-    const byEmail = await prisma.user.findFirst({
-      where: { email: { equals: authEmail, mode: 'insensitive' } },
+  } catch {
+    return await prisma.user.findUnique({
+      where: { authId: authUserId },
       select: baseUserSelect,
     });
-
-    if (byEmail) {
-      try {
-        await prisma.user.update({
-          where: { id: byEmail.id },
-          data: { authId: authUserId, lastLogin: new Date() },
-        });
-      } catch {
-        try {
-          await prisma.user.update({
-            where: { id: byEmail.id },
-            data: { lastLogin: new Date() },
-          });
-        } catch {
-          // Ignore non-fatal timestamp update failure
-        }
-      }
-      user = byEmail;
-    }
   }
-
-  return user;
 }
 
 export async function login(input: LoginInput) {
@@ -88,13 +103,23 @@ export async function login(input: LoginInput) {
     password: input.password,
   });
 
+  // H4: Always return a generic error message to prevent account enumeration
   if (error || !data.session?.access_token || !data.user?.email) {
-    throw AppError.unauthorized(error?.message || 'Invalid email or password');
+    throw AppError.unauthorized('Invalid email or password');
   }
 
-  const user = await resolveOrLinkAdminUser(data.user.id, data.user.email);
+  // H1: Require verified email before linking or granting admin access
+  const emailVerified = Boolean(
+    data.user.email_confirmed_at ||
+      (data.user.user_metadata && data.user.user_metadata.email_verified === true),
+  );
+  if (!emailVerified) {
+    throw AppError.unauthorized('Invalid email or password');
+  }
+
+  const user = await resolveOrLinkAdminUser(data.user.id, data.user.email, emailVerified);
   if (!user || !user.isActive) {
-    throw AppError.unauthorized('Account is not active or not found');
+    throw AppError.unauthorized('Invalid email or password');
   }
 
   return {

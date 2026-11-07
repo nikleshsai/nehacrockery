@@ -39,3 +39,9 @@ Thumbs.db
 
 # ── Uploads (local only) ──────────────────────────────
 backend/uploads/
+
+# ── Spreadsheets & working data files (F6) ────────────
+*.xlsx
+*.xls
+*.csv
+!backend/tests/**/*.csv

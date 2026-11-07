@@ -5,23 +5,31 @@ import slugify from 'slugify';
 import prisma from '../config/database';
 
 export function createSlug(text: string): string {
-  return slugify(text, { lower: true, strict: true, trim: true });
+  const slug = slugify(text, { lower: true, strict: true, trim: true });
+  return slug || 'item';
 }
 
 /**
  * Generate a unique slug for a given model.
- * Appends -1, -2, … if the base slug already exists.
+ * Appends -1, -2, … if the base slug already exists in the DB or in `reservedSlugs` (B1).
  */
 export async function generateUniqueSlug(
   text: string,
   model: 'product' | 'category' | 'brand',
   excludeId?: string,
+  reservedSlugs?: Set<string>,
 ): Promise<string> {
   const base = createSlug(text);
   let candidate = base;
   let counter = 1;
 
   while (true) {
+    if (reservedSlugs && reservedSlugs.has(candidate)) {
+      candidate = `${base}-${counter}`;
+      counter++;
+      continue;
+    }
+
     let existing: { id: string } | null = null;
 
     if (model === 'product') {
@@ -36,6 +44,10 @@ export async function generateUniqueSlug(
 
     candidate = `${base}-${counter}`;
     counter++;
+  }
+
+  if (reservedSlugs) {
+    reservedSlugs.add(candidate);
   }
 
   return candidate;

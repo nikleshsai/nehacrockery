@@ -26,11 +26,13 @@ export async function adminListCategories(_req: Request, res: Response): Promise
 
 export async function adminCreateCategory(req: Request, res: Response): Promise<void> {
   const category = await categoryService.createCategory(req.body);
+  res.locals.entityId = category.id;
   sendCreated(res, category, 'Category created successfully');
 }
 
 export async function adminUpdateCategory(req: Request, res: Response): Promise<void> {
   const category = await categoryService.updateCategory(req.params.id, req.body);
+  res.locals.entityId = category.id;
   sendSuccess(res, category, 'Category updated successfully');
 }
 
@@ -60,11 +62,13 @@ export async function adminListBrands(_req: Request, res: Response): Promise<voi
 
 export async function adminCreateBrand(req: Request, res: Response): Promise<void> {
   const brand = await categoryService.createBrand(req.body);
+  res.locals.entityId = brand.id;
   sendCreated(res, brand, 'Brand created successfully');
 }
 
 export async function adminUpdateBrand(req: Request, res: Response): Promise<void> {
   const brand = await categoryService.updateBrand(req.params.id, req.body);
+  res.locals.entityId = brand.id;
   sendSuccess(res, brand, 'Brand updated successfully');
 }
 

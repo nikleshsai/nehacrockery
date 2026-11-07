@@ -2,16 +2,20 @@
 // Request validation middleware using Zod
 // ─────────────────────────────────────────────────────────────────────────────
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodTypeAny, ZodError } from 'zod';
 
 /**
- * Validates req.body against a Zod schema.
+ * Validates req.body or req.query against a Zod schema.
  * Passes ZodError to next() for centralized handling.
  */
-export function validate(schema: AnyZodObject) {
+export function validate(schema: ZodTypeAny, target: 'body' | 'query' = 'body') {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      req.body = await schema.parseAsync(req.body);
+      if (target === 'query') {
+        req.query = await schema.parseAsync(req.query);
+      } else {
+        req.body = await schema.parseAsync(req.body);
+      }
       next();
     } catch (err) {
       if (err instanceof ZodError) {
@@ -26,13 +30,6 @@ export function validate(schema: AnyZodObject) {
 /**
  * Validates req.query against a Zod schema.
  */
-export function validateQuery(schema: AnyZodObject) {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
-    try {
-      req.query = await schema.parseAsync(req.query);
-      next();
-    } catch (err) {
-      next(err);
-    }
-  };
+export function validateQuery(schema: ZodTypeAny) {
+  return validate(schema, 'query');
 }

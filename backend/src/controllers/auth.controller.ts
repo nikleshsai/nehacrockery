@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { Request, Response, NextFunction } from 'express';
 import * as authService from '../services/auth.service';
+import { evictCachedToken } from '../middleware/auth';
 import { auditFromRequest } from '../services/audit.service';
 import { sendSuccess } from '../utils/apiResponse';
 import { AuditAction } from '@prisma/client';
@@ -31,7 +32,16 @@ export function authConfig(_req: Request, res: Response): void {
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
-  await auditFromRequest(req, AuditAction.LOGOUT, 'User', req.user?.id, `Admin logout: ${req.user?.email}`);
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.slice(7).trim() : undefined;
+  evictCachedToken(token);
+  await auditFromRequest(
+    req,
+    AuditAction.LOGOUT,
+    'User',
+    req.user?.id,
+    `Admin logout: ${req.user?.email}`,
+  );
   sendSuccess(res, null, 'Logged out successfully');
 }
 

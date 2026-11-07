@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import path from 'path';
 import { getSupabaseClient } from '../config/supabase';
+import { verifyBufferSignature } from '../middleware/upload';
 import { AppError } from '../utils/AppError';
 import { logger } from '../utils/logger';
 
@@ -28,15 +29,22 @@ export interface UploadResult {
 /**
  * Upload a file buffer to a Supabase Storage bucket.
  *
- * @param bucket   Target bucket name
- * @param file     Multer file object (uses memoryStorage — buffer is populated)
- * @param folder   Sub-folder inside the bucket (e.g. 'products', 'shop')
+ * Security hardening:
+ * - M4: Verifies magic-byte file signature before uploading.
+ * - H6: Never falls back to storing base64 data URIs in the database.
  */
 export async function uploadFile(
   bucket: StorageBucket,
   file: Express.Multer.File,
   folder = '',
 ): Promise<UploadResult> {
+  if (!verifyBufferSignature(file.buffer, file.mimetype, file.originalname)) {
+    throw AppError.badRequest(
+      `Uploaded file "${file.originalname}" failed magic-byte signature validation`,
+      'INVALID_FILE_SIGNATURE',
+    );
+  }
+
   const supabase = getSupabaseClient();
 
   const ext = path.extname(file.originalname).toLowerCase();
@@ -67,15 +75,6 @@ export async function uploadFile(
   }
 
   if (error) {
-    // Fallback for image uploads so Admin product image upload works even if Supabase Storage bucket policies block it
-    if (file.mimetype && file.mimetype.startsWith('image/')) {
-      logger.warn(`Supabase Storage upload failed [${bucket}/${storagePath}] (${error.message}); using inline data URL fallback.`);
-      const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-      return {
-        publicUrl: dataUrl,
-        storagePath: `inline/${uniqueName}`,
-      };
-    }
     logger.error(`Supabase Storage upload failed [${bucket}/${storagePath}]:`, error);
     throw AppError.internal(`File upload failed: ${error.message}`);
   }

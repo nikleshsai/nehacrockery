@@ -138,10 +138,11 @@ function buildProductOrderBy(
 }
 
 // ── PUBLIC: List products ─────────────────────────────────────────────────────
-export async function listProducts(query: ProductQueryInput) {
+export async function listProducts(query: ProductQueryInput, maxPageSize = 200) {
   const { page, pageSize, skip, take } = parsePagination(
     query.page,
-    query.pageSize
+    query.pageSize,
+    maxPageSize
   );
   const where = buildProductWhere(query);
   const orderBy = buildProductOrderBy(
@@ -183,58 +184,72 @@ export async function getProductById(id: string) {
   return product;
 }
 
-// ── ADMIN: Create product ─────────────────────────────────────────────────────
+// ── ADMIN: Create product (B6: retry on P2002 slug race) ─────────────────────
 export async function createProduct(data: CreateProductInput) {
-  const slug = await generateUniqueSlug(data.name, "product");
   const cleanImageUrl = data.imageUrl?.trim() || null;
+  const reservedSlugs = new Set<string>();
 
-  const product = await prisma.product.create({
-    data: {
-      name: data.name,
-      slug,
-      productCode: data.productCode ?? null,
-      description: data.description ?? null,
-      brandId: data.brandId ?? null,
-      categoryId: data.categoryId ?? null,
-      material: data.material ?? null,
-      capacity: data.capacity ?? null,
-      dimensions: data.dimensions ?? null,
-      colourFinish: data.colourFinish ?? null,
-      setContents: data.setContents ?? null,
-      piecesPerSet: data.piecesPerSet ?? null,
-      caseQty: data.caseQty ?? null,
-      packagingInformation: data.packagingInformation ?? null,
-      features: data.features ?? [],
-      collection: data.collection ?? null,
-      subcategory: data.subcategory ?? null,
-      mrp: data.mrp ?? null,
-      catalogueMrp: data.catalogueMrp ?? data.mrp ?? null,
-      wholesalePrice: data.wholesalePrice ?? null,
-      websitePrice: data.websitePrice ?? null,
-      priceUnit: data.priceUnit ?? null,
-      cataloguePage: data.cataloguePage ?? null,
-      sourceFile: data.sourceFile ?? null,
-      isFeatured: data.isFeatured ?? false,
-      isNewArrival: data.isNewArrival ?? false,
-      isActive: data.isActive ?? true,
-      seoTitle: data.seoTitle ?? null,
-      seoDescription: data.seoDescription ?? null,
-      ...(cleanImageUrl && {
-        images: {
-          create: [
-            {
-              imageUrl: cleanImageUrl,
-              altText: data.name,
-              sortOrder: 0,
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const slug = await generateUniqueSlug(data.name, "product", undefined, reservedSlugs);
+    try {
+      return await prisma.product.create({
+        data: {
+          name: data.name,
+          slug,
+          productCode: data.productCode ?? null,
+          description: data.description ?? null,
+          brandId: data.brandId ?? null,
+          categoryId: data.categoryId ?? null,
+          material: data.material ?? null,
+          capacity: data.capacity ?? null,
+          dimensions: data.dimensions ?? null,
+          colourFinish: data.colourFinish ?? null,
+          setContents: data.setContents ?? null,
+          piecesPerSet: data.piecesPerSet ?? null,
+          caseQty: data.caseQty ?? null,
+          packagingInformation: data.packagingInformation ?? null,
+          features: data.features ?? [],
+          collection: data.collection ?? null,
+          subcategory: data.subcategory ?? null,
+          mrp: data.mrp ?? null,
+          catalogueMrp: data.catalogueMrp ?? data.mrp ?? null,
+          wholesalePrice: data.wholesalePrice ?? null,
+          websitePrice: data.websitePrice ?? null,
+          priceUnit: data.priceUnit ?? null,
+          cataloguePage: data.cataloguePage ?? null,
+          sourceFile: data.sourceFile ?? null,
+          isFeatured: data.isFeatured ?? false,
+          isNewArrival: data.isNewArrival ?? false,
+          isActive: data.isActive ?? true,
+          seoTitle: data.seoTitle ?? null,
+          seoDescription: data.seoDescription ?? null,
+          ...(cleanImageUrl && {
+            images: {
+              create: [
+                {
+                  imageUrl: cleanImageUrl,
+                  altText: data.name,
+                  sortOrder: 0,
+                },
+              ],
             },
-          ],
+          }),
         },
-      }),
-    },
-    select: productPublicSelect,
-  });
+        select: productPublicSelect,
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        attempt < 3
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
 
-  return product;
+  throw AppError.internal("Could not generate a unique slug for product");
 }
 
 // ── ADMIN: Update product ─────────────────────────────────────────────────────
@@ -300,7 +315,8 @@ export async function updateProduct(id: string, data: UpdateProductInput) {
       ...(data.features !== undefined && { features: data.features }),
       ...(data.collection !== undefined && { collection: data.collection }),
       ...(data.subcategory !== undefined && { subcategory: data.subcategory }),
-      ...(data.mrp !== undefined && { mrp: data.mrp, catalogueMrp: data.mrp }),
+      // B3: Do not overwrite catalogueMrp when only mrp is updated
+      ...(data.mrp !== undefined && { mrp: data.mrp }),
       ...(data.catalogueMrp !== undefined && { catalogueMrp: data.catalogueMrp }),
       ...(data.wholesalePrice !== undefined && { wholesalePrice: data.wholesalePrice }),
       ...(data.websitePrice !== undefined && { websitePrice: data.websitePrice }),

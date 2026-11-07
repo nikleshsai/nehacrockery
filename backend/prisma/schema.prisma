@@ -14,7 +14,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// â”€â”€ ENUMS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ENUMS ────────────────────────────────────────────────────────────────────
 
 enum UserRole {
   SUPER_ADMIN
@@ -46,7 +46,7 @@ enum CatalogueRequestStatus {
   CLOSED
 }
 
-// â”€â”€ MODELS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MODELS ───────────────────────────────────────────────────────────────────
 
 model User {
   id           String    @id @default(cuid())
@@ -113,7 +113,7 @@ model Product {
   brand                Brand?         @relation(fields: [brandId], references: [id], onDelete: SetNull)
   categoryId           String?        @map("category_id")
   category             Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  // â”€â”€ Physical attributes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Physical attributes ─────────────────────────────────────
   material             String?
   capacity             String?
   dimensions           String?
@@ -123,28 +123,28 @@ model Product {
   caseQty              Int?           @map("case_qty")
   packagingInformation String?        @map("packaging_information")
   features             String[]
-  // â”€â”€ Classification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Classification ──────────────────────────────────────────
   collection           String?
   subcategory          String?
-  // â”€â”€ Pricing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Pricing ─────────────────────────────────────────────────
   mrp                  Decimal?       @db.Decimal(10, 2)
   catalogueMrp         Decimal?       @db.Decimal(10, 2) @map("catalogue_mrp")
   wholesalePrice       Decimal?       @db.Decimal(10, 2) @map("wholesale_price")
   websitePrice         Decimal?       @db.Decimal(10, 2) @map("website_price")
   priceUnit            String?        @map("price_unit")
-  // â”€â”€ Catalogue traceability â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Catalogue traceability ───────────────────────────────────
   cataloguePage        String?        @map("catalogue_page")
   sourceFile           String?        @map("source_file")
   reviewStatus         String?        @map("review_status")
   nameVerified         Boolean?       @map("name_verified")
-  // â”€â”€ Status flags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Status flags ────────────────────────────────────────────
   isFeatured           Boolean        @default(false) @map("is_featured")
   isNewArrival         Boolean        @default(false) @map("is_new_arrival")
   isActive             Boolean        @default(true) @map("is_active")
-  // â”€â”€ SEO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── SEO ─────────────────────────────────────────────────────
   seoTitle             String?        @map("seo_title")
   seoDescription       String?        @map("seo_description")
-  // â”€â”€ Relations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Relations ───────────────────────────────────────────────
   images               ProductImage[]
   enquiries            Enquiry[]
   createdAt            DateTime       @default(now()) @map("created_at")
@@ -158,6 +158,11 @@ model Product {
   @@index([isNewArrival])
   @@index([productCode])
   @@index([collection])
+  @@index([isActive, categoryId])
+  @@index([isActive, brandId])
+  @@index([isActive, isFeatured])
+  @@index([isActive, isNewArrival])
+  @@index([isActive, createdAt])
   @@map("products")
 }
 
@@ -194,6 +199,7 @@ model Enquiry {
   @@index([customerType])
   @@index([productId])
   @@index([createdAt])
+  @@index([status, createdAt])
   @@map("enquiries")
 }
 
@@ -301,6 +307,7 @@ model Sale {
 
   @@index([status])
   @@index([createdAt])
+  @@index([status, createdAt])
   @@map("sales")
 }
 

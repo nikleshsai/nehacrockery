@@ -364,16 +364,17 @@
         var sale = d.sale || {};
         var biz = d.business || {};
         onDone({
-          billNumber: d.billNumber || sale.saleNumber || payload.billNumber || generateFallbackBillNumber(),
+          billNumber: d.billNumber || sale.saleNumber || generateFallbackBillNumber(),
+          billAccessToken: d.billAccessToken || null,
           dateStr: new Date(sale.createdAt || Date.now()).toLocaleString('en-IN'),
-          customerName: payload.customerName,
-          companyName: payload.companyName || '',
-          phone: payload.phone,
-          email: payload.email || '',
-          paymentRef: d.paymentRef || payload.razorpayPaymentId || payload.transactionRef || ('PAY-' + Date.now().toString(36).toUpperCase()),
-          paymentMethod: d.paymentMethod || payload.paymentMethod || 'Online Payment',
-          items: payload.items,
-          totalAmount: payload.items.reduce(function (s, i) { return s + i.quantity * i.unitPrice; }, 0),
+          customerName: sale.customerName || payload.customerName,
+          companyName: sale.companyName || payload.companyName || '',
+          phone: sale.phone || payload.phone,
+          email: sale.email || payload.email || '',
+          paymentRef: d.paymentRef || payload.razorpayPaymentId || ('PAY-' + Date.now().toString(36).toUpperCase()),
+          paymentMethod: d.paymentMethod || payload.paymentMethod || 'Cash at Store Pickup',
+          items: Array.isArray(sale.items) && sale.items.length > 0 ? sale.items : payload.items,
+          totalAmount: Number(sale.totalAmount) || payload.items.reduce(function (s, i) { return s + i.quantity * i.unitPrice; }, 0),
           businessName: biz.businessName || getBusinessName(),
           pickupAddress: biz.pickupAddress || getPickupAddress(),
           businessPhone: biz.phone || getBusinessPhone(),
@@ -499,14 +500,13 @@
       var txRef = 'RZP-' + Date.now().toString(36).toUpperCase() + (userRef ? '-' + userRef.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() : '');
 
       finalizeOrderOnBackend({
-        billNumber: initData.billNumber,
+        orderToken: initData.orderToken || null,
         customerName: customer.customerName,
         companyName: customer.companyName,
         phone: customer.phone,
         email: customer.email,
         items: items,
-        paymentMethod: selectedMethod,
-        transactionRef: txRef
+        paymentMethod: 'Cash at Store Pickup'
       }, function (bill) {
         modal.remove();
         showGeneratedBillInDrawer(bill);
@@ -529,6 +529,7 @@
 
     var itemsPayload = cart.map(function (c) {
       return {
+        slug: c.slug || null,
         productName: c.name,
         productCode: c.code || null,
         quantity: c.qty,
@@ -540,15 +541,13 @@
       var cashBtn = e.target;
       cashBtn.disabled = true;
       cashBtn.textContent = 'Generating Cash Pickup Bill…';
-      var cashRef = 'CASH-' + Date.now().toString(36).toUpperCase();
       finalizeOrderOnBackend({
         customerName: name,
         companyName: company || null,
         phone: phone,
         email: email || null,
         items: itemsPayload,
-        paymentMethod: 'Cash at Store Pickup',
-        transactionRef: cashRef
+        paymentMethod: 'Cash at Store Pickup'
       }, function (bill) {
         showGeneratedBillInDrawer(bill);
       });
@@ -613,7 +612,7 @@
               },
               handler: function (response) {
                 finalizeOrderOnBackend({
-                  billNumber: initData.billNumber,
+                  orderToken: initData.orderToken || null,
                   customerName: name,
                   companyName: company || null,
                   phone: phone,

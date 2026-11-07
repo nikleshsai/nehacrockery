@@ -36,13 +36,36 @@ export async function createBanner(data: {
   sortOrder?: number;
   isActive?: boolean;
 }) {
-  return prisma.banner.create({ data, select: bannerSelect });
+  return prisma.banner.create({
+    data: {
+      title: data.title,
+      subtitle: data.subtitle ?? null,
+      image: data.image,
+      buttonText: data.buttonText ?? null,
+      buttonUrl: data.buttonUrl ?? null,
+      sortOrder: data.sortOrder ?? 0,
+      isActive: data.isActive ?? true,
+    },
+    select: bannerSelect,
+  });
 }
 
 export async function updateBanner(id: string, data: Partial<Parameters<typeof createBanner>[0]>) {
   const existing = await prisma.banner.findUnique({ where: { id }, select: { id: true } });
   if (!existing) throw AppError.notFound('Banner');
-  return prisma.banner.update({ where: { id }, data, select: bannerSelect });
+  return prisma.banner.update({
+    where: { id },
+    data: {
+      ...(data.title !== undefined && { title: data.title }),
+      ...(data.subtitle !== undefined && { subtitle: data.subtitle }),
+      ...(data.image !== undefined && { image: data.image }),
+      ...(data.buttonText !== undefined && { buttonText: data.buttonText }),
+      ...(data.buttonUrl !== undefined && { buttonUrl: data.buttonUrl }),
+      ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+      ...(data.isActive !== undefined && { isActive: data.isActive }),
+    },
+    select: bannerSelect,
+  });
 }
 
 export async function deleteBanner(id: string) {
@@ -107,28 +130,48 @@ export async function getSiteSettings() {
 
 export async function upsertSiteSettings(data: Partial<{
   businessName: string;
-  tagline: string;
-  phone: string;
-  whatsapp: string;
-  email: string;
-  address: string;
-  warehouseAddress: string;
-  businessHours: string;
-  googleMapsUrl: string;
-  facebook: string;
-  instagram: string;
-  twitter: string;
-  youtube: string;
-  linkedin: string;
-  gstNumber: string;
-  panNumber: string;
+  tagline: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  address: string | null;
+  warehouseAddress: string | null;
+  businessHours: string | null;
+  googleMapsUrl: string | null;
+  facebook: string | null;
+  instagram: string | null;
+  twitter: string | null;
+  youtube: string | null;
+  linkedin: string | null;
+  gstNumber: string | null;
+  panNumber: string | null;
 }>) {
+  // M3: Whitelist allowed settings columns to prevent mass assignment
+  const cleanData = {
+    ...(data.businessName !== undefined && { businessName: data.businessName }),
+    ...(data.tagline !== undefined && { tagline: data.tagline }),
+    ...(data.phone !== undefined && { phone: data.phone }),
+    ...(data.whatsapp !== undefined && { whatsapp: data.whatsapp }),
+    ...(data.email !== undefined && { email: data.email }),
+    ...(data.address !== undefined && { address: data.address }),
+    ...(data.warehouseAddress !== undefined && { warehouseAddress: data.warehouseAddress }),
+    ...(data.businessHours !== undefined && { businessHours: data.businessHours }),
+    ...(data.googleMapsUrl !== undefined && { googleMapsUrl: data.googleMapsUrl }),
+    ...(data.facebook !== undefined && { facebook: data.facebook }),
+    ...(data.instagram !== undefined && { instagram: data.instagram }),
+    ...(data.twitter !== undefined && { twitter: data.twitter }),
+    ...(data.youtube !== undefined && { youtube: data.youtube }),
+    ...(data.linkedin !== undefined && { linkedin: data.linkedin }),
+    ...(data.gstNumber !== undefined && { gstNumber: data.gstNumber }),
+    ...(data.panNumber !== undefined && { panNumber: data.panNumber }),
+  };
+
   const existing = await prisma.siteSettings.findFirst({ orderBy: { createdAt: 'asc' } });
   if (existing) {
-    return prisma.siteSettings.update({ where: { id: existing.id }, data });
+    return prisma.siteSettings.update({ where: { id: existing.id }, data: cleanData });
   }
   return prisma.siteSettings.create({
-    data: { businessName: data.businessName ?? 'Neha Crockery House', ...data },
+    data: { ...cleanData, businessName: cleanData.businessName ?? 'Neha Crockery House' },
   });
 }
 

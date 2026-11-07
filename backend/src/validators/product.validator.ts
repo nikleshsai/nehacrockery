@@ -1,13 +1,33 @@
 // =============================================================================
 // Zod validators for product endpoints
-// Updated: includes new catalogue fields
+// Updated: includes new catalogue fields and H6/L8 URL validation
 // =============================================================================
 import { z } from "zod";
+
+const imageUrlSchema = z
+  .string()
+  .trim()
+  .max(2048, "Image URL must be at most 2048 characters")
+  .refine(
+    (val) =>
+      val === "" ||
+      (!val.toLowerCase().startsWith("data:") &&
+        (val.startsWith("https://") ||
+          val.startsWith("http://") ||
+          val.startsWith("/assets/") ||
+          val.startsWith("/uploads/"))),
+    {
+      message:
+        "Image URL must be a valid HTTP(S) or /assets/ URL (base64 data URIs are not permitted; use the image upload endpoint instead)",
+    },
+  )
+  .optional()
+  .nullable();
 
 export const createProductSchema = z.object({
   name: z.string().min(1, "Product name is required").max(255),
   productCode: z.string().max(100).optional().nullable(),
-  description: z.string().optional().nullable(),
+  description: z.string().max(5000).optional().nullable(),
   brandId: z.string().cuid().optional().nullable(),
   categoryId: z.string().cuid().optional().nullable(),
   // Physical
@@ -15,11 +35,11 @@ export const createProductSchema = z.object({
   capacity: z.string().max(100).optional().nullable(),
   dimensions: z.string().max(255).optional().nullable(),
   colourFinish: z.string().max(255).optional().nullable(),
-  setContents: z.string().optional().nullable(),
+  setContents: z.string().max(2000).optional().nullable(),
   piecesPerSet: z.number().int().positive().optional().nullable(),
   caseQty: z.number().int().positive().optional().nullable(),
-  packagingInformation: z.string().optional().nullable(),
-  features: z.array(z.string()).default([]),
+  packagingInformation: z.string().max(2000).optional().nullable(),
+  features: z.array(z.string().max(500)).max(50).default([]),
   // Classification
   collection: z.string().max(255).optional().nullable(),
   subcategory: z.string().max(255).optional().nullable(),
@@ -39,19 +59,19 @@ export const createProductSchema = z.object({
   // SEO
   seoTitle: z.string().max(160).optional().nullable(),
   seoDescription: z.string().max(320).optional().nullable(),
-  // Optional primary image URL (supports https://, /assets/..., or data:image/... URI)
-  imageUrl: z.string().max(8_000_000, "Image URL or data is too large").optional().nullable(),
+  // Primary image URL (H6: only HTTP(S) or /assets/ URLs; base64 data URIs are rejected)
+  imageUrl: imageUrlSchema,
 });
 
 export const updateProductSchema = createProductSchema.partial();
 
 export const productQuerySchema = z.object({
-  page: z.string().optional(),
-  pageSize: z.string().optional(),
-  search: z.string().optional(),
-  category: z.string().optional(),
-  brand: z.string().optional(),
-  collection: z.string().optional(),
+  page: z.string().regex(/^\d+$/, "page must be a positive integer").optional(),
+  pageSize: z.string().regex(/^\d+$/, "pageSize must be a positive integer").optional(),
+  search: z.string().max(200).optional(),
+  category: z.string().max(100).optional(),
+  brand: z.string().max(100).optional(),
+  collection: z.string().max(100).optional(),
   featured: z.enum(["true", "false"]).optional(),
   newArrival: z.enum(["true", "false"]).optional(),
   active: z.enum(["true", "false", "all"]).optional().default("true"),

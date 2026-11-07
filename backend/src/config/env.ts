@@ -16,6 +16,7 @@ function requireEnv(key: string, fallback?: string): string {
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '4000', 10),
+  trustProxy: parseInt(process.env.TRUST_PROXY ?? '1', 10),
 
   database: {
     url: requireEnv('DATABASE_URL'),
@@ -30,6 +31,7 @@ export const config = {
     anonKey: process.env.SUPABASE_ANON_KEY,
     // NEVER expose service role key to the frontend
     serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    jwtSecret: process.env.SUPABASE_JWT_SECRET,
   },
 
   cors: {
@@ -45,16 +47,28 @@ export const config = {
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '900000', 10),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS ?? '100', 10),
+    authMaxRequests: parseInt(process.env.AUTH_RATE_LIMIT_MAX ?? '5', 10),
+    publicWriteMaxRequests: parseInt(process.env.PUBLIC_WRITE_RATE_LIMIT_MAX ?? '15', 10),
   },
 
   upload: {
     maxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB ?? '10', 10),
-    strategy: (process.env.STORAGE_STRATEGY ?? 'local') as 'local' | 'cloudinary' | 's3',
+    strategy: (process.env.STORAGE_STRATEGY ?? 'supabase') as
+      | 'supabase'
+      | 'local'
+      | 'cloudinary'
+      | 's3',
   },
 
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID ?? '',
     keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
+  },
+
+  security: {
+    orderTokenSecret:
+      process.env.ORDER_TOKEN_SECRET ??
+      (process.env.RAZORPAY_KEY_SECRET || requireEnv('SUPABASE_SERVICE_ROLE_KEY')),
   },
 } as const;
 

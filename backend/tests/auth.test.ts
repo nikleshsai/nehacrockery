@@ -53,7 +53,14 @@ describe('GET /api/v1/auth/me', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns the current user with a valid token and links auth_id', async () => {
+  it('returns 401 for an unverified Supabase email (H1)', async () => {
+    const res = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer unverified-token:${ADMIN_EMAIL}`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns the current user with a valid verified token and links auth_id', async () => {
     const res = await request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data.email).toBe(ADMIN_EMAIL);
@@ -77,11 +84,20 @@ describe('POST /api/v1/auth/logout', () => {
   });
 });
 
-describe('Login endpoint removed', () => {
-  it('POST /api/v1/auth/login no longer exists (handled by Supabase Auth)', async () => {
+describe('POST /api/v1/auth/login (B7 / H4)', () => {
+  it('validates email and password format with 400 VALIDATION_ERROR', async () => {
     const res = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: ADMIN_EMAIL, password: 'x' });
-    expect(res.status).toBe(404);
+      .send({ email: 'not-an-email', password: '' });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns generic 401 Invalid email or password on failed login', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: ADMIN_EMAIL, password: 'wrong-password' });
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe('Invalid email or password');
   });
 });

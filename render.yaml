@@ -37,15 +37,9 @@ services:
       - key: DIRECT_URL
         sync: false
 
-      # ── JWT ───────────────────────────────────────────────────────────────
-      - key: JWT_SECRET
-        sync: false
-
-      - key: JWT_EXPIRES_IN
-        value: 7d
-
-      - key: JWT_COOKIE_EXPIRES_DAYS
-        value: "7"
+      # ── Reverse Proxy (Render load balancer) ───────────────────────────────
+      - key: TRUST_PROXY
+        value: "1"
 
       # ── CORS ──────────────────────────────────────────────────────────────
       # Replace with your real Vercel domain(s) after deploying.
@@ -83,4 +77,7 @@ services:
         value: "100"
 
       - key: AUTH_RATE_LIMIT_MAX
-        value: "10"
+        value: "5"
+
+      - key: PUBLIC_WRITE_RATE_LIMIT_MAX
+        value: "15"

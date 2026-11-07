@@ -35,8 +35,8 @@ export async function adminUpdateSale(req: Request, res: Response): Promise<void
 
 export async function adminDeleteSale(req: Request, res: Response): Promise<void> {
   const saleId = req.params.id;
-  await auditService.auditFromRequest(req, AuditAction.DELETE, 'Sale', saleId, 'Deleted sale');
   await salesService.deleteSale(saleId);
+  await auditService.auditFromRequest(req, AuditAction.DELETE, 'Sale', saleId, 'Deleted sale');
   sendNoContent(res);
 }
 
@@ -63,6 +63,7 @@ export async function completeOnlineOrder(req: Request, res: Response): Promise<
 }
 
 export async function getBillByNumber(req: Request, res: Response): Promise<void> {
-  const result = await salesService.getBillByNumber(req.params.billNumber);
+  const { token, phone } = req.query as { token?: string; phone?: string };
+  const result = await salesService.getBillByNumber(req.params.billNumber, { token, phone });
   sendSuccess(res, result);
 }

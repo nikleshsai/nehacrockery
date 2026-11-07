@@ -2,8 +2,10 @@
 // Site controller — banners, reviews, site settings, catalogues, shop gallery
 // ─────────────────────────────────────────────────────────────────────────────
 import { Request, Response } from 'express';
+import { AuditAction } from '@prisma/client';
 import * as siteService from '../services/site.service';
 import * as storageService from '../services/storage.service';
+import { auditFromRequest } from '../services/audit.service';
 import { sendSuccess, sendCreated, sendNoContent } from '../utils/apiResponse';
 
 // ── BANNERS ───────────────────────────────────────────────────────────────────
@@ -20,16 +22,19 @@ export async function adminListBanners(_req: Request, res: Response): Promise<vo
 
 export async function adminCreateBanner(req: Request, res: Response): Promise<void> {
   const banner = await siteService.createBanner(req.body);
+  await auditFromRequest(req, AuditAction.CREATE, 'Banner', banner.id, `Created banner: ${banner.title}`);
   sendCreated(res, banner, 'Banner created');
 }
 
 export async function adminUpdateBanner(req: Request, res: Response): Promise<void> {
   const banner = await siteService.updateBanner(req.params.id, req.body);
+  await auditFromRequest(req, AuditAction.UPDATE, 'Banner', banner.id, `Updated banner: ${banner.title}`);
   sendSuccess(res, banner, 'Banner updated');
 }
 
 export async function adminDeleteBanner(req: Request, res: Response): Promise<void> {
   await siteService.deleteBanner(req.params.id);
+  await auditFromRequest(req, AuditAction.DELETE, 'Banner', req.params.id, 'Deleted banner');
   sendNoContent(res);
 }
 
@@ -47,16 +52,19 @@ export async function adminListReviews(_req: Request, res: Response): Promise<vo
 
 export async function adminCreateReview(req: Request, res: Response): Promise<void> {
   const review = await siteService.createReview(req.body);
+  await auditFromRequest(req, AuditAction.CREATE, 'Review', review.id, `Created review by ${review.customerName}`);
   sendCreated(res, review, 'Review created');
 }
 
 export async function adminUpdateReview(req: Request, res: Response): Promise<void> {
   const review = await siteService.updateReview(req.params.id, req.body);
+  await auditFromRequest(req, AuditAction.UPDATE, 'Review', review.id, `Updated review ${review.id}`);
   sendSuccess(res, review, 'Review updated');
 }
 
 export async function adminDeleteReview(req: Request, res: Response): Promise<void> {
   await siteService.deleteReview(req.params.id);
+  await auditFromRequest(req, AuditAction.DELETE, 'Review', req.params.id, 'Deleted review');
   sendNoContent(res);
 }
 
@@ -69,6 +77,7 @@ export async function getSiteSettings(_req: Request, res: Response): Promise<voi
 
 export async function adminUpdateSettings(req: Request, res: Response): Promise<void> {
   const settings = await siteService.upsertSiteSettings(req.body);
+  await auditFromRequest(req, AuditAction.SETTINGS_CHANGE, 'SiteSettings', settings.id, 'Updated site settings');
   sendSuccess(res, settings, 'Settings updated');
 }
 
@@ -111,22 +120,25 @@ export async function adminCreateCatalogue(req: Request, res: Response): Promise
           ? true
           : (req.body.isActive ?? true),
   });
+  await auditFromRequest(req, AuditAction.CREATE, 'Catalogue', catalogue.id, `Created catalogue: ${catalogue.title}`);
   sendCreated(res, catalogue, 'Catalogue created');
 }
 
 export async function adminUpdateCatalogue(req: Request, res: Response): Promise<void> {
   const catalogue = await siteService.updateCatalogue(req.params.id, req.body);
+  await auditFromRequest(req, AuditAction.UPDATE, 'Catalogue', catalogue.id, `Updated catalogue: ${catalogue.title}`);
   sendSuccess(res, catalogue, 'Catalogue updated');
 }
 
 export async function adminDeleteCatalogue(req: Request, res: Response): Promise<void> {
   // Fetch catalogue so we can delete the PDF from Supabase Storage too
   const catalogue = await siteService.getCatalogueById(req.params.id);
+  await siteService.deleteCatalogue(req.params.id);
   if (catalogue?.fileUrl) {
     const storagePath = storageService.storagePathFromUrl(catalogue.fileUrl, 'catalogues');
     await storageService.deleteFile('catalogues', storagePath);
   }
-  await siteService.deleteCatalogue(req.params.id);
+  await auditFromRequest(req, AuditAction.DELETE, 'Catalogue', req.params.id, 'Deleted catalogue');
   sendNoContent(res);
 }
 
@@ -174,6 +186,7 @@ export async function adminCreateShopMedia(req: Request, res: Response): Promise
     sortOrder: req.body.sortOrder ? parseInt(req.body.sortOrder, 10) : 0,
     isActive: req.body.isActive === 'false' ? false : true,
   });
+  await auditFromRequest(req, AuditAction.CREATE, 'ShopMedia', media.id, `Uploaded shop media: ${media.title ?? media.id}`);
   sendCreated(res, media, 'Shop media uploaded');
 }
 
@@ -182,7 +195,7 @@ export async function adminUpdateShopMedia(req: Request, res: Response): Promise
     title: req.body.title,
     description: req.body.description,
     thumbnailUrl: req.body.thumbnailUrl,
-    sortOrder: req.body.sortOrder !== undefined ? parseInt(req.body.sortOrder, 10) : undefined,
+    sortOrder: req.body.sortOrder !== undefined ? parseInt(String(req.body.sortOrder), 10) : undefined,
     isActive:
       req.body.isActive !== undefined
         ? req.body.isActive === 'false'
@@ -190,16 +203,18 @@ export async function adminUpdateShopMedia(req: Request, res: Response): Promise
           : Boolean(req.body.isActive)
         : undefined,
   });
+  await auditFromRequest(req, AuditAction.UPDATE, 'ShopMedia', media.id, `Updated shop media: ${media.id}`);
   sendSuccess(res, media, 'Shop media updated');
 }
 
 export async function adminDeleteShopMedia(req: Request, res: Response): Promise<void> {
-  // Fetch the record so we can delete the file from Supabase Storage too
+  // Fetch the record so we can delete the file from Supabase Storage after DB deletion succeeds
   const media = await siteService.getShopMediaById(req.params.id);
+  await siteService.deleteShopMedia(req.params.id);
   if (media?.mediaUrl) {
     const storagePath = storageService.storagePathFromUrl(media.mediaUrl, 'shop-gallery');
     await storageService.deleteFile('shop-gallery', storagePath);
   }
-  await siteService.deleteShopMedia(req.params.id);
+  await auditFromRequest(req, AuditAction.DELETE, 'ShopMedia', req.params.id, 'Deleted shop media');
   sendNoContent(res);
 }
