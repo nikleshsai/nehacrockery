@@ -1,9 +1,13 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '@/lib/auth';
 import type { Brand, Category, Product } from '@/lib/types';
 import { Alert, Badge, Btn, Card, Field, Input, Modal, PageHeader, Pager, Select, Table, Textarea, useAdminList } from '@/components/admin/ui';
 
-type Form = Partial<Omit<Product, 'features'>> & { featuresText?: string };
+type Form = Partial<Omit<Product, 'features'>> & {
+  featuresText?: string;
+  imageUrl?: string | null;
+  previewUrl?: string;
+};
 
 const num = (v: unknown) => (v === '' || v == null ? null : Number(v));
 
@@ -20,14 +24,60 @@ export default function ProductsAdminPage() {
   const [editing, setEditing] = useState<Form | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
+  const quickImgRef = useRef<HTMLInputElement>(null);
+  const [quickImgProductId, setQuickImgProductId] = useState<string | null>(null);
 
-  const open = (p?: Product) =>
-    setEditing(p ? { ...p, featuresText: (p.features ?? []).join('\n') } : { isActive: true, isFeatured: false, isNewArrival: false, featuresText: '' });
+  const open = (p?: Product) => {
+    const existingImg = p?.images?.[0]?.imageUrl ?? '';
+    setEditing(
+      p
+        ? {
+            ...p,
+            featuresText: (p.features ?? []).join('\n'),
+            imageUrl: existingImg,
+            previewUrl: existingImg,
+          }
+        : {
+            isActive: true,
+            isFeatured: false,
+            isNewArrival: false,
+            featuresText: '',
+            imageUrl: '',
+            previewUrl: '',
+          },
+    );
+  };
+
+  const triggerQuickImageUpload = (productId: string) => {
+    setQuickImgProductId(productId);
+    if (quickImgRef.current) {
+      quickImgRef.current.value = '';
+      quickImgRef.current.click();
+    }
+  };
+
+  const handleQuickImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !quickImgProductId) return;
+    const fd = new FormData();
+    fd.append('images', file);
+    try {
+      await adminRequest(`/admin/products/${quickImgProductId}/images`, { method: 'POST', formData: fd });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setQuickImgProductId(null);
+      if (quickImgRef.current) quickImgRef.current.value = '';
+    }
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!editing) return;
-    const body = {
+    const files = imgRef.current?.files;
+    const hasFile = Boolean(files && files.length > 0);
+    const body: Record<string, unknown> = {
       name: editing.name,
       productCode: editing.productCode || null,
       description: editing.description || null,
@@ -47,12 +97,14 @@ export default function ProductsAdminPage() {
       isFeatured: editing.isFeatured ?? false,
       isNewArrival: editing.isNewArrival ?? false,
     };
+    if (!hasFile && editing.imageUrl !== undefined) {
+      body.imageUrl = editing.imageUrl ? editing.imageUrl.trim() : null;
+    }
     try {
       let id = editing.id;
       if (id) await adminRequest(`/admin/products/${id}`, { method: 'PUT', body });
       else id = (await adminRequest<Product>('/admin/products', { method: 'POST', body })).data.id;
 
-      const files = imgRef.current?.files;
       if (id && files && files.length > 0) {
         const fd = new FormData();
         Array.from(files).forEach((f) => fd.append('images', f));
@@ -99,6 +151,7 @@ export default function ProductsAdminPage() {
         actions={
           <>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={importFile} />
+            <input ref={quickImgRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleQuickImageChange} />
             <Btn variant="outline" onClick={() => fileRef.current?.click()}>Import CSV/Excel</Btn>
             <Btn onClick={() => open()}>+ Add Product</Btn>
           </>
@@ -114,7 +167,21 @@ export default function ProductsAdminPage() {
           {loading && <tr><td className="p-4" colSpan={8}>Loading…</td></tr>}
           {items.map((p) => (
             <tr key={p.id}>
-              <td className="px-4 py-3">{p.images?.[0] ? <img src={p.images[0].imageUrl} alt="" className="h-10 w-10 object-cover rounded" /> : '—'}</td>
+              <td className="px-4 py-3">
+                {p.images?.[0] ? (
+                  <img
+                    src={p.images[0].imageUrl}
+                    alt={p.name}
+                    title="Click to change product image"
+                    onClick={() => triggerQuickImageUpload(p.id)}
+                    className="h-11 w-11 object-cover rounded border cursor-pointer"
+                  />
+                ) : (
+                  <Btn variant="outline" type="button" onClick={() => triggerQuickImageUpload(p.id)}>
+                    📷 + Image
+                  </Btn>
+                )}
+              </td>
               <td className="px-4 py-3 font-semibold text-navy">{p.name}</td>
               <td className="px-4 py-3">{p.productCode ?? '—'}</td>
               <td className="px-4 py-3">{p.category?.name ?? '—'}</td>
@@ -126,6 +193,7 @@ export default function ProductsAdminPage() {
                 {p.isNewArrival && <Badge tone="blue">New</Badge>}
               </td>
               <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                <Btn variant="outline" onClick={() => triggerQuickImageUpload(p.id)}>📷 Image</Btn>
                 <Btn variant="outline" onClick={() => open(p)}>Edit</Btn>
                 <Btn variant="danger" onClick={() => remove(p)}>Delete</Btn>
               </td>
@@ -139,6 +207,48 @@ export default function ProductsAdminPage() {
         <Modal title={editing.id ? 'Edit Product' : 'New Product'} onClose={() => setEditing(null)}>
           <form onSubmit={save} className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Field label="Name *"><Input required value={editing.name ?? ''} onChange={(e) => set({ name: e.target.value })} /></Field></div>
+            {editing.previewUrl && (
+              <div className="col-span-2 flex items-center gap-3 p-2.5 rounded border bg-slate-50">
+                <img src={editing.previewUrl} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                <div className="flex-1 text-xs text-slate-600 truncate">{editing.imageUrl || 'Selected file'}</div>
+                <Btn
+                  variant="outline"
+                  type="button"
+                  onClick={() => {
+                    if (imgRef.current) imgRef.current.value = '';
+                    set({ imageUrl: null, previewUrl: '' });
+                  }}
+                >
+                  ✕ Remove
+                </Btn>
+              </div>
+            )}
+            <Field label="Upload Product Image">
+              <input
+                ref={imgRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="text-xs"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => set({ previewUrl: String(ev.target?.result || ''), imageUrl: '' });
+                    reader.readAsDataURL(f);
+                  }
+                }}
+              />
+            </Field>
+            <Field label="Or Image URL / Path">
+              <Input
+                placeholder="/assets/images/... or https://..."
+                value={editing.imageUrl ?? ''}
+                onChange={(e) => {
+                  if (imgRef.current) imgRef.current.value = '';
+                  set({ imageUrl: e.target.value, previewUrl: e.target.value.trim() });
+                }}
+              />
+            </Field>
             <Field label="Product code"><Input value={editing.productCode ?? ''} onChange={(e) => set({ productCode: e.target.value })} /></Field>
             <Field label="Collection"><Input value={editing.collection ?? ''} onChange={(e) => set({ collection: e.target.value })} /></Field>
             <Field label="Category">
@@ -163,7 +273,6 @@ export default function ProductsAdminPage() {
             <Field label="Set contents"><Input value={editing.setContents ?? ''} onChange={(e) => set({ setContents: e.target.value })} /></Field>
             <div className="col-span-2"><Field label="Description"><Textarea rows={3} value={editing.description ?? ''} onChange={(e) => set({ description: e.target.value })} /></Field></div>
             <div className="col-span-2"><Field label="Features (one per line)"><Textarea rows={3} value={editing.featuresText ?? ''} onChange={(e) => set({ featuresText: e.target.value })} /></Field></div>
-            <div className="col-span-2"><Field label="Add images"><input ref={imgRef} type="file" accept="image/*" multiple className="text-xs" /></Field></div>
             <div className="col-span-2 flex gap-6 text-xs">
               <label className="flex items-center gap-2"><input type="checkbox" checked={editing.isActive ?? true} onChange={(e) => set({ isActive: e.target.checked })} /> Active</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={editing.isFeatured ?? false} onChange={(e) => set({ isFeatured: e.target.checked })} /> Featured</label>

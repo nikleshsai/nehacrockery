@@ -707,7 +707,7 @@
     state.pages.products = page || 1;
     var tbody = $('products-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="8" class="td-loading"><span class="spinner spinner-dark"></span> Loading products…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="td-loading"><span class="spinner spinner-dark"></span> Loading products…</td></tr>';
 
     var q = 'page=' + state.pages.products + '&pageSize=30&sortBy=name&sortOrder=asc';
     if (state.filters.productSearch) q += '&search=' + encodeURIComponent(state.filters.productSearch);
@@ -720,7 +720,7 @@
 
     api('GET', '/admin/products?' + q, null, function (err, res) {
       if (err) {
-        tbody.innerHTML = '<tr><td colspan="8" class="td-empty" style="color:var(--c-danger);">' + esc(err.message) + '</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="td-empty" style="color:var(--c-danger);">' + esc(err.message) + '</td></tr>';
         return;
       }
       var products = res.data || [];
@@ -729,7 +729,7 @@
       if (countEl) countEl.textContent = (pagination.total || products.length) + ' products total';
 
       if (!products.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="td-empty">No products found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="td-empty">No products found</td></tr>';
         renderPagination('products-pagination', pagination, function (p) { loadProducts(p); });
         return;
       }
@@ -741,7 +741,14 @@
 
       tbody.innerHTML = filtered.map(function (p) {
         var mrp = p.catalogueMrp || p.mrp;
+        var primaryImg = (p.images && p.images[0] && p.images[0].imageUrl) || p.imageUrl || '';
+        var imgCell = primaryImg
+          ? '<div style="display:flex;align-items:center;gap:6px;">' +
+              '<img src="' + esc(primaryImg) + '" alt="' + esc(p.name) + '" onclick="quickUploadProductImage(\'' + p.id + '\')" title="Click to change product image" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--c-border);cursor:pointer;" />' +
+            '</div>'
+          : '<button type="button" class="btn btn-xs btn-ghost" onclick="quickUploadProductImage(\'' + p.id + '\')" title="Upload product image" style="font-size:11px;padding:4px 8px;border:1px dashed var(--c-border);">📷 + Image</button>';
         return '<tr>' +
+          '<td>' + imgCell + '</td>' +
           '<td><strong>' + esc(p.name) + '</strong>' +
           (p.isNewArrival ? ' <span class="badge badge-new-arr">NEW</span>' : '') +
           (p.isFeatured ? ' <span class="badge badge-featured">★</span>' : '') +
@@ -753,6 +760,7 @@
           '<td class="font-mono">' + (p.wholesalePrice ? fmtPrice(p.wholesalePrice) : '—') + '</td>' +
           '<td><span class="badge ' + (p.isActive ? 'badge-active' : 'badge-inactive') + '">' + (p.isActive ? 'Active' : 'Inactive') + '</span></td>' +
           '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<button class="btn btn-sm btn-ghost" onclick="quickUploadProductImage(\'' + p.id + '\')" title="Upload / Change Product Image">📷 Image</button>' +
           '<button class="btn btn-sm btn-ghost" onclick="editProduct(\'' + p.id + '\')">Edit</button>' +
           '<button class="btn btn-sm btn-ghost" onclick="toggleProductFlag(\'' + p.id + '\',\'featured\',' + (p.isFeatured ? 'true' : 'false') + ')" title="Toggle Featured">' + (p.isFeatured ? '⭐' : '☆') + '</button>' +
           '<button class="btn btn-sm btn-ghost" onclick="toggleProductFlag(\'' + p.id + '\',\'newArrival\',' + (p.isNewArrival ? 'true' : 'false') + ')" title="Toggle New Arrival">' + (p.isNewArrival ? '🆕' : '🔲') + '</button>' +
@@ -765,6 +773,28 @@
     });
   }
   window.loadProducts = loadProducts;
+
+  window.quickUploadProductImage = function (productId) {
+    var input = $('quick-product-img-input');
+    if (!input) return;
+    input.value = '';
+    input.onchange = function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      toast('Uploading product image…', 'info');
+      var fd = new FormData();
+      fd.append('images', file);
+      api('POST', '/admin/products/' + productId + '/images', fd, function (err) {
+        if (err) {
+          toast('Image upload failed: ' + err.message, 'error');
+          return;
+        }
+        toast('Product image uploaded!', 'success');
+        loadProducts(state.pages.products);
+      }, true);
+    };
+    input.click();
+  };
 
   window.editProduct = function (id) {
     api('GET', '/admin/products/' + id, null, function (err, data) {
@@ -827,6 +857,7 @@
 
     // ── Image fields ──────────────────────────────────────────────────────
     var imageUrl = p ? (p.imageUrl || (p.images && p.images[0] && p.images[0].imageUrl) || p.image || p.primaryImage || '') : '';
+    state._clearProductImage = false;
     var urlInput = $('pf-image-url');
     var fileInput = $('pf-image-file');
     var previewWrap = $('pf-img-preview-wrap');
@@ -852,13 +883,17 @@
 
     // Live preview when user types a URL
     if (urlInput) {
-      urlInput.oninput = function () { refreshPreview(urlInput.value.trim()); };
+      urlInput.oninput = function () {
+        state._clearProductImage = false;
+        refreshPreview(urlInput.value.trim());
+      };
     }
     // Live preview when a file is selected
     if (fileInput) {
       fileInput.onchange = function () {
         var f = fileInput.files[0];
         if (f) {
+          state._clearProductImage = false;
           var reader = new FileReader();
           reader.onload = function (e) { refreshPreview(e.target.result); };
           reader.readAsDataURL(f);
@@ -869,6 +904,7 @@
     // Remove button clears both
     if (clearBtn) {
       clearBtn.onclick = function () {
+        state._clearProductImage = true;
         if (urlInput) urlInput.value = '';
         if (fileInput) fileInput.value = '';
         refreshPreview('');
@@ -1935,7 +1971,8 @@
     }
 
     var rawUrl = urlInput ? urlInput.value.trim() : '';
-    doSave(!hasFile && rawUrl ? rawUrl : undefined);
+    var nextImageUrl = !hasFile ? (rawUrl ? rawUrl : (state._clearProductImage ? null : undefined)) : undefined;
+    doSave(nextImageUrl);
   }
 
 

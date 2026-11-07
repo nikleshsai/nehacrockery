@@ -274,8 +274,8 @@ export async function updateProduct(id: string, data: UpdateProductInput) {
           },
         });
       }
-    } else if (primaryImage && data.imageUrl === null) {
-      await prisma.productImage.delete({ where: { id: primaryImage.id } });
+    } else if (primaryImage && (data.imageUrl === null || data.imageUrl === "")) {
+      await prisma.productImage.deleteMany({ where: { productId: id } });
     }
   }
 
@@ -338,16 +338,36 @@ export async function addProductImage(
 ) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   if (!product) throw AppError.notFound("Product");
+
+  const targetOrder = sortOrder ?? 0;
+  if (targetOrder === 0) {
+    const existingPrimary = await prisma.productImage.findFirst({
+      where: { productId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true },
+    });
+    if (existingPrimary) {
+      return prisma.productImage.update({
+        where: { id: existingPrimary.id },
+        data: {
+          imageUrl,
+          altText: altText ?? product.name,
+          sortOrder: 0,
+        },
+        select: imageSelect,
+      });
+    }
+  }
 
   return prisma.productImage.create({
     data: {
       productId,
       imageUrl,
-      altText: altText ?? null,
-      sortOrder: sortOrder ?? 0,
+      altText: altText ?? product.name,
+      sortOrder: targetOrder,
     },
     select: imageSelect,
   });

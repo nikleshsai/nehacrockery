@@ -39,8 +39,8 @@ export const createProductSchema = z.object({
   // SEO
   seoTitle: z.string().max(160).optional().nullable(),
   seoDescription: z.string().max(320).optional().nullable(),
-  // Optional primary image URL
-  imageUrl: z.string().url("Invalid image URL").optional().nullable().or(z.literal("")),
+  // Optional primary image URL (supports https://, /assets/..., or data:image/... URI)
+  imageUrl: z.string().max(8_000_000, "Image URL or data is too large").optional().nullable(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

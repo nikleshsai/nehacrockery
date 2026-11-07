@@ -267,9 +267,11 @@
         </div>
 
         <div class="table-wrap overflowable">
+          <input type="file" id="quick-product-img-input" accept="image/jpeg,image/png,image/webp" style="display:none;" />
           <table class="data-table" id="products-table">
             <thead>
               <tr>
+                <th style="width:76px;">Image</th>
                 <th>Product</th>
                 <th>Brand</th>
                 <th>Category</th>
@@ -281,7 +283,7 @@
               </tr>
             </thead>
             <tbody id="products-tbody">
-              <tr><td colspan="8" class="td-loading">Loading products…</td></tr>
+              <tr><td colspan="9" class="td-loading">Loading products…</td></tr>
             </tbody>
           </table>
         </div>
@@ -914,6 +916,31 @@
           </div>
 
           <div class="form-full">
+            <p class="form-section-title">Product Image</p>
+          </div>
+          <!-- Current image preview -->
+          <div class="form-full" id="pf-img-preview-wrap" style="display:none;">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--c-surface);border-radius:var(--r-md);border:1.5px solid var(--c-border);">
+              <img id="pf-img-preview" src="" alt="Product image" style="width:72px;height:72px;object-fit:cover;border-radius:var(--r-sm);border:1px solid var(--c-border);" />
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:600;color:var(--c-muted);margin-bottom:4px;">PRODUCT IMAGE PREVIEW</div>
+                <div id="pf-img-preview-name" style="font-size:12px;color:var(--c-text);word-break:break-all;"></div>
+              </div>
+              <button type="button" class="btn btn-sm btn-ghost" id="pf-img-clear" style="color:var(--c-danger);">✕ Remove</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Upload Image File (Computer / Phone)</label>
+            <input type="file" class="form-input" id="pf-image-file" accept="image/jpeg,image/png,image/webp" />
+            <p class="form-hint">JPEG, PNG or WebP — max 5 MB. Shows live preview immediately.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Or Paste Image URL / Path</label>
+            <input type="text" class="form-input" id="pf-image-url" placeholder="/assets/images/product_tumblers.jpg  or  https://..." />
+            <p class="form-hint">Paste a direct image link or relative path if not uploading a file.</p>
+          </div>
+
+          <div class="form-full">
             <p class="form-section-title">Physical Attributes</p>
           </div>
           <div class="form-group">
@@ -991,31 +1018,6 @@
           <div class="form-group form-full">
             <label class="form-label">Description</label>
             <textarea class="form-textarea" id="pf-description" rows="3" placeholder="Product description…"></textarea>
-          </div>
-
-          <div class="form-full">
-            <p class="form-section-title">Images</p>
-          </div>
-          <!-- Current image preview -->
-          <div class="form-full" id="pf-img-preview-wrap" style="display:none;">
-            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--c-surface);border-radius:var(--r-md);border:1.5px solid var(--c-border);">
-              <img id="pf-img-preview" src="" alt="Product image" style="width:72px;height:72px;object-fit:cover;border-radius:var(--r-sm);border:1px solid var(--c-border);" />
-              <div style="flex:1;">
-                <div style="font-size:12px;font-weight:600;color:var(--c-muted);margin-bottom:4px;">CURRENT IMAGE</div>
-                <div id="pf-img-preview-name" style="font-size:12px;color:var(--c-text);word-break:break-all;"></div>
-              </div>
-              <button type="button" class="btn btn-sm btn-ghost" id="pf-img-clear" style="color:var(--c-danger);">✕ Remove</button>
-            </div>
-          </div>
-          <div class="form-group form-full">
-            <label class="form-label">Primary Image URL</label>
-            <input type="text" class="form-input" id="pf-image-url" placeholder="/uploads/images/product.jpg  or  https://..." />
-            <p class="form-hint">Enter a URL or upload a file below. URL takes priority if both are provided.</p>
-          </div>
-          <div class="form-group form-full">
-            <label class="form-label">Upload Image File</label>
-            <input type="file" class="form-input" id="pf-image-file" accept="image/jpeg,image/png,image/webp" />
-            <p class="form-hint">JPEG, PNG or WebP — max 5 MB. Replaces the URL above if a file is chosen.</p>
           </div>
 
           <div class="form-full">
