@@ -3,8 +3,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { config } from './config/env';
 import { logger } from './utils/logger';
-import prisma from './config/database';
+import prisma, { ensureDatabaseSchema } from './config/database';
 import app from './app';
+
+ensureDatabaseSchema().catch((err) => {
+  logger.warn('Initial schema check failed:', err);
+});
 
 const server = app.listen(config.port, () => {
   logger.info(`

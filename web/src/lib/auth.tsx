@@ -24,9 +24,17 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const TOKEN_STORAGE_KEY = 'nch_admin_token';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [backendToken, setBackendToken] = useState<string | null>(() => {
+    try {
+      return typeof window !== 'undefined' ? sessionStorage.getItem(TOKEN_STORAGE_KEY) : null;
+    } catch {
+      return null;
+    }
+  });
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,17 +51,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+
     if (!isSupabaseConfigured) {
-      setLoading(false);
-      return;
+      if (backendToken) {
+        loadAdminProfile(backendToken).finally(() => {
+          if (mounted) setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
+      return () => {
+        mounted = false;
+      };
     }
 
-    let mounted = true;
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       if (!mounted) return;
       setSession(initialSession);
-      if (initialSession?.access_token) {
-        await loadAdminProfile(initialSession.access_token);
+      const tokenToUse = initialSession?.access_token ?? backendToken;
+      if (tokenToUse) {
+        await loadAdminProfile(tokenToUse);
       }
       if (mounted) setLoading(false);
     });
@@ -64,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       if (nextSession?.access_token) {
         await loadAdminProfile(nextSession.access_token);
-      } else {
+      } else if (!backendToken) {
         setUser(null);
       }
     });
@@ -73,15 +91,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [loadAdminProfile]);
+  }, [backendToken, loadAdminProfile]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
       setError(null);
+      try {
+        const loginRes = await request<{ token: string; user: AdminUser }>('/auth/login', {
+          method: 'POST',
+          body: { email, password },
+        });
+        if (loginRes.data?.token) {
+          setBackendToken(loginRes.data.token);
+          try {
+            sessionStorage.setItem(TOKEN_STORAGE_KEY, loginRes.data.token);
+          } catch {
+            /* ignore storage errors */
+          }
+          setUser(loginRes.data.user);
+          return;
+        }
+      } catch (err) {
+        if (!isSupabaseConfigured) {
+          throw err;
+        }
+      }
+
       const { data, error: sbErr } = await supabase.auth.signInWithPassword({ email, password });
       if (sbErr) throw new Error(sbErr.message);
       if (!data.session?.access_token) throw new Error('No session returned from Supabase Auth');
       setSession(data.session);
+      try {
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, data.session.access_token);
+      } catch {
+        /* ignore storage errors */
+      }
       const res = await request<AdminUser>('/auth/me', { token: data.session.access_token });
       setUser(res.data);
     },
@@ -89,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(async () => {
-    const token = session?.access_token;
+    const token = session?.access_token ?? backendToken;
     if (token) {
       try {
         await request('/auth/logout', { method: 'POST', token });
@@ -97,17 +141,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         /* ignore logout audit errors */
       }
     }
-    await supabase.auth.signOut();
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    try {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    } catch {
+      /* ignore storage errors */
+    }
+    setBackendToken(null);
     setSession(null);
     setUser(null);
-  }, [session?.access_token]);
+  }, [backendToken, session?.access_token]);
 
   const adminRequest = useCallback(
     async <T,>(path: string, opts: Omit<RequestOptions, 'token'> = {}): Promise<ApiEnvelope<T>> => {
-      const token = session?.access_token ?? (await supabase.auth.getSession()).data.session?.access_token ?? null;
+      const token =
+        session?.access_token ??
+        backendToken ??
+        (isSupabaseConfigured ? (await supabase.auth.getSession()).data.session?.access_token : null) ??
+        null;
       return request<T>(path, { ...opts, token });
     },
-    [session?.access_token],
+    [backendToken, session?.access_token],
   );
 
   return (
@@ -115,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         session,
-        token: session?.access_token ?? null,
+        token: session?.access_token ?? backendToken ?? null,
         loading,
         error,
         signIn,

@@ -113,10 +113,7 @@ export default function ContactPage() {
                   </h3>
                   <p className="contact-card-text">
                     <span className="hours-row">
-                      <strong>
-                        Mon &ndash; Sat
-                      </strong>
-                      {' '}&nbsp; 10:30 AM &ndash; 7:30 PM
+                      {c.hours}
                     </span>
                     {' '}
                     <span className="hours-row">

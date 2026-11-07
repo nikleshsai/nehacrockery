@@ -6,8 +6,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
 import { AppError } from '../utils/AppError';
-import prisma from '../config/database';
 import { getSupabaseClient } from '../config/supabase';
+import { resolveOrLinkAdminUser } from '../services/auth.service';
 
 // Augment Express Request type
 declare global {
@@ -57,31 +57,7 @@ export async function authenticate(
     }
 
     // ── Map Supabase user → local user (role, active flag) ─────────────────
-    const select = {
-      id: true,
-      authId: true,
-      email: true,
-      role: true,
-      name: true,
-      isActive: true,
-    } as const;
-
-    let user = await prisma.user.findUnique({ where: { authId: authUserId }, select });
-
-    if (!user) {
-      // First login: link by email (case-insensitive)
-      const byEmail = await prisma.user.findFirst({
-        where: { email: { equals: authEmail, mode: 'insensitive' } },
-        select,
-      });
-      if (byEmail) {
-        await prisma.user.update({
-          where: { id: byEmail.id },
-          data: { authId: authUserId, lastLogin: new Date() },
-        });
-        user = { ...byEmail, authId: authUserId };
-      }
-    }
+    const user = await resolveOrLinkAdminUser(authUserId, authEmail);
 
     // A valid Supabase account without a local admin record has no access.
     if (!user || !user.isActive) {

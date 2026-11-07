@@ -33,9 +33,13 @@ export const config = {
   },
 
   cors: {
-    origins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:5173')
+    origins: (
+      process.env.CORS_ORIGINS ??
+      'http://localhost:3000,http://localhost:5173,https://nehacrockery.vercel.app,https://neha-crockery.vercel.app,https://nehacrockery.com'
+    )
       .split(',')
-      .map((o) => o.trim()),
+      .map((o) => o.trim())
+      .filter(Boolean),
   },
 
   rateLimit: {
@@ -46,6 +50,11 @@ export const config = {
   upload: {
     maxSizeMb: parseInt(process.env.UPLOAD_MAX_SIZE_MB ?? '10', 10),
     strategy: (process.env.STORAGE_STRATEGY ?? 'local') as 'local' | 'cloudinary' | 's3',
+  },
+
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID ?? '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET ?? '',
   },
 } as const;
 

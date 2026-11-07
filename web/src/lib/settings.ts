@@ -9,20 +9,28 @@ import { getData } from './api';
 import type { SiteSettings } from './types';
 
 const DEFAULTS = {
+  businessName: 'Neha Crockery House',
+  tagline: 'South India’s Trusted Glassware & Crockery Partner',
   phone: '+91 97102 54681',
-  whatsapp: '918870413413',
+  whatsapp: '919710254681',
   email: 'nehacrockeryhouse2001@gmail.com',
   address: '13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai, Tamil Nadu 600003',
   hours: 'Mon – Sat: 10:30 AM – 7:30 PM',
 };
 
 export interface Contact {
+  businessName: string;
+  tagline: string;
+  hours: string;
   phoneDisplay: string;
   whatsappDisplay: string;
   telHref: string;
   mailHref: string;
   email: string;
   address: string;
+  warehouseAddress: string | null;
+  gstNumber: string | null;
+  panNumber: string | null;
   addressBr: ReactNode;
   mapsUrl: string;
   waNumber: string;
@@ -68,12 +76,18 @@ export function computeContact(s?: Partial<SiteSettings> | null): Contact {
       : address;
 
   return {
+    businessName: s?.businessName || DEFAULTS.businessName,
+    tagline: s?.tagline || DEFAULTS.tagline,
+    hours: s?.businessHours || DEFAULTS.hours,
     phoneDisplay: formatIndian(telNumber, phoneRaw),
     whatsappDisplay: formatIndian(waNumber, whatsappRaw),
     telHref: `tel:+${telNumber}`,
     mailHref: `mailto:${email}`,
     email,
     address,
+    warehouseAddress: s?.warehouseAddress || null,
+    gstNumber: s?.gstNumber || null,
+    panNumber: s?.panNumber || null,
     addressBr,
     mapsUrl: s?.googleMapsUrl || mapsSearchUrl(address),
     waNumber,
@@ -84,13 +98,16 @@ export function computeContact(s?: Partial<SiteSettings> | null): Contact {
 const ContactContext = createContext<Contact>(computeContact());
 
 const CACHE_KEY = 'nch_site_settings';
+const VERSION_KEY = 'nch_settings_version';
 const CACHE_TTL = 5 * 60 * 1000;
 
 function readCache(): SiteSettings | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { ts: number; data: SiteSettings };
+    const parsed = JSON.parse(raw) as { ts: number; ver?: string; data: SiteSettings };
+    const currentVer = localStorage.getItem(VERSION_KEY) || '';
+    if (currentVer && parsed.ver && parsed.ver !== currentVer) return null;
     return Date.now() - parsed.ts < CACHE_TTL ? parsed.data : null;
   } catch {
     return null;
@@ -101,22 +118,43 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings | null>(() => readCache());
 
   useEffect(() => {
-    if (settings) return;
     const ctrl = new AbortController();
-    getData<SiteSettings>('/site-settings', ctrl.signal)
-      .then((data) => {
-        setSettings(data);
+    const fetchFresh = () => {
+      getData<SiteSettings>('/site-settings', ctrl.signal)
+        .then((data) => {
+          if (!data) return;
+          setSettings(data);
+          try {
+            const ver = localStorage.getItem(VERSION_KEY) || '';
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), ver, data }));
+          } catch {
+            /* storage unavailable */
+          }
+        })
+        .catch(() => {
+          /* keep defaults */
+        });
+    };
+
+    // Always revalidate from backend so Admin Settings changes apply immediately
+    fetchFresh();
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === VERSION_KEY) {
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+          sessionStorage.removeItem(CACHE_KEY);
         } catch {
-          /* storage unavailable */
+          /* ignore */
         }
-      })
-      .catch(() => {
-        /* keep defaults */
-      });
-    return () => ctrl.abort();
-  }, [settings]);
+        fetchFresh();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      ctrl.abort();
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   const contact = useMemo(() => computeContact(settings), [settings]);
   return createElement(ContactContext.Provider, { value: contact }, children);

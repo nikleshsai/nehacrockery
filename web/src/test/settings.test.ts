@@ -4,7 +4,7 @@ import { computeContact } from '@/lib/settings';
 describe('computeContact', () => {
   it('falls back to defaults', () => {
     const c = computeContact(null);
-    expect(c.waNumber).toBe('918870413413');
+    expect(c.waNumber).toBe('919710254681');
     expect(c.telHref).toBe('tel:+919710254681');
   });
 
@@ -16,7 +16,7 @@ describe('computeContact', () => {
   });
 
   it('builds wa.me links with encoded text', () => {
-    expect(computeContact(null).wa('Hi there')).toBe('https://wa.me/918870413413?text=Hi%20there');
+    expect(computeContact(null).wa('Hi there')).toBe('https://wa.me/919710254681?text=Hi%20there');
   });
 });
 

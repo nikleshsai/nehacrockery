@@ -52,7 +52,7 @@ services:
       # Include both custom domain AND the free .vercel.app subdomain.
       # Example: https://nehacrockery.com,https://neha-crockery.vercel.app
       - key: CORS_ORIGINS
-        value: https://nehacrockery.com,https://neha-crockery.vercel.app
+        value: https://nehacrockery.com,https://nehacrockery.vercel.app,https://neha-crockery.vercel.app
 
       # ── Supabase Auth ─────────────────────────────────────────────────────
       - key: SUPABASE_URL

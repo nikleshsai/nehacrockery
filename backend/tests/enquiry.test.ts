@@ -32,7 +32,7 @@ describe('POST /api/v1/enquiries', () => {
       .post('/api/v1/enquiries')
       .send({
         name: 'Test Enquiry Person',
-        phone: '+91 8870413413',
+        phone: '+91 97102 54681',
         email: 'test@example.com',
         customerType: 'WHOLESALER',
         message: 'Please send me your latest catalogue',

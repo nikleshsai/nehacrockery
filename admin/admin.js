@@ -14,9 +14,29 @@
   var API = '/api/v1';
 
   var TOKEN_KEY = 'nch_admin_token';
-  // Supabase config — anon key is safe to expose in frontend
-  var SUPABASE_URL = 'https://rptvadjhblznngaoaaxn.supabase.co';
-  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwdHZhZGpoYmx6bm5nYW9hYXhuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0OTg1MzIsImV4cCI6MjEwNjA3NDUzMn0.b-zhfMxeiNQCjnbLF2e8YBMfh_71ztrq1YoQdagoxrI';
+
+  // Scrub any accidentally submitted credentials (?email=...&password=...) from the URL bar immediately
+  if (typeof window !== 'undefined' && window.location && window.location.search) {
+    try {
+      window.history.replaceState(
+        null,
+        document.title,
+        window.location.pathname + (window.location.hash || '')
+      );
+    } catch (e) { /* ignore history errors */ }
+  }
+
+  function getMetaContent(name) {
+    if (typeof document === 'undefined') return '';
+    var el = document.querySelector('meta[name="' + name + '"]');
+    return el ? (el.getAttribute('content') || '').trim() : '';
+  }
+
+  // Runtime auth config — populated from meta tags or /api/v1/auth/config (never hardcoded)
+  var authConfig = {
+    supabaseUrl: (typeof window !== 'undefined' && window.__NCH_AUTH_CONFIG__ && window.__NCH_AUTH_CONFIG__.supabaseUrl) || getMetaContent('supabase-url') || '',
+    supabaseAnonKey: (typeof window !== 'undefined' && window.__NCH_AUTH_CONFIG__ && window.__NCH_AUTH_CONFIG__.supabaseAnonKey) || getMetaContent('supabase-anon-key') || '',
+  };
 
   /* ── STATE ─────────────────────────────────────────────────────────────── */
   var state = {
@@ -420,19 +440,64 @@
       });
   }
 
-  /* -- LOGIN (Supabase Auth) -- */
+  /* -- LOGIN (Backend /auth/login + Dynamic Supabase Auth Config) -- */
+  function loadRuntimeAuthConfig(cb) {
+    if (authConfig.supabaseUrl && authConfig.supabaseAnonKey) {
+      if (cb) cb(authConfig);
+      return;
+    }
+    fetch(API + '/auth/config', { method: 'GET' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var d = j && (j.data || j);
+        if (d) {
+          if (d.supabaseUrl) authConfig.supabaseUrl = d.supabaseUrl;
+          if (d.supabaseAnonKey) authConfig.supabaseAnonKey = d.supabaseAnonKey;
+        }
+        if (cb) cb(authConfig);
+      })
+      .catch(function () {
+        if (cb) cb(authConfig);
+      });
+  }
+
+  function signInViaSupabaseDirect(email, pw, onSuccess, onError) {
+    var sbUrl = authConfig.supabaseUrl || getMetaContent('supabase-url');
+    var sbKey = authConfig.supabaseAnonKey || getMetaContent('supabase-anon-key');
+    if (!sbUrl || !sbKey) {
+      onError('Authentication service is not configured. Please check backend environment variables.');
+      return;
+    }
+    fetch(sbUrl.replace(/\/+$/, '') + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': sbKey },
+      body: JSON.stringify({ email: email, password: pw })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.error || !d.access_token) {
+          onError(d.error_description || d.message || d.error || 'Invalid email or password.');
+          return;
+        }
+        onSuccess(
+          d.access_token,
+          d.user ? {
+            email: d.user.email,
+            name: (d.user.user_metadata && d.user.user_metadata.name) || d.user.email
+          } : null
+        );
+      })
+      .catch(function () {
+        onError('Network error while signing in. Please try again.');
+      });
+  }
+
   function setupLogin() {
     var form = $('login-form');
     if (!form) return;
 
-    // Show setup warning if Supabase key not configured
-    if (!SUPABASE_ANON_KEY) {
-      var warn = document.createElement('div');
-      warn.style.cssText = 'background:#fef3c7;border:1px solid #d97706;border-radius:8px;padding:12px;font-size:12px;color:#92400e;margin-bottom:16px;line-height:1.5;';
-      warn.innerHTML = '<strong>⚠️ Supabase setup needed:</strong> Add your Supabase ANON key to admin.js and create your admin user in <a href="https://supabase.com/dashboard/project/rptvadjhblznngaoaaxn/auth/users" target="_blank" style="color:#1d4ed8;text-decoration:underline;">Supabase Auth → Users</a>.';
-      var loginBox = form.closest('.login-box') || form.parentNode;
-      loginBox.insertBefore(warn, form);
-    }
+    // Preload runtime auth config from backend
+    loadRuntimeAuthConfig();
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -446,46 +511,41 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Signing in…';
 
-      if (!SUPABASE_ANON_KEY) {
-        // Fallback to backend JWT auth while Supabase is being configured
-        api('POST', '/auth/login', { email: email, password: pw }, function (err, data) {
-          btn.disabled = false; btn.textContent = 'Sign In →';
-          if (err) { errEl.textContent = err.message || 'Login failed.'; return; }
-          var token = (data.data && data.data.token) || data.token;
-          var user = (data.data && data.data.user) || data.user;
-          if (!token) { errEl.textContent = 'No token returned. Try again.'; return; }
-          state.token = token; state.user = user;
-          sessionStorage.setItem(TOKEN_KEY, token);
-          showDashboard();
-        });
-        return;
+      function finishLogin(token, user) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In →';
+        state.token = token;
+        state.user = user || null;
+        sessionStorage.setItem(TOKEN_KEY, token);
+        showDashboard();
       }
 
-      // Supabase Auth: sign in with email + password
-      fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ email: email, password: pw })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          btn.disabled = false; btn.textContent = 'Sign In →';
-          if (d.error || !d.access_token) {
-            errEl.textContent = d.error_description || d.message || d.error || 'Invalid credentials.';
+      function failLogin(msg) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In →';
+        errEl.textContent = msg || 'Login failed.';
+      }
+
+      // Primary: authenticate via backend /api/v1/auth/login
+      api('POST', '/auth/login', { email: email, password: pw }, function (err, data) {
+        if (!err && data) {
+          var token = (data.data && data.data.token) || data.token;
+          var user = (data.data && data.data.user) || data.user;
+          if (token) {
+            finishLogin(token, user);
             return;
           }
-          state.token = d.access_token;
-          state.user = d.user ? {
-            email: d.user.email,
-            name: (d.user.user_metadata && d.user.user_metadata.name) || d.user.email
-          } : null;
-          sessionStorage.setItem(TOKEN_KEY, d.access_token);
-          showDashboard();
-        })
-        .catch(function () {
-          btn.disabled = false; btn.textContent = 'Sign In →';
-          errEl.textContent = 'Network error. Please try again.';
-        });
+        }
+        // Fallback: if backend /auth/login is not available yet (e.g. 404 before redeploy),
+        // use runtime Supabase Auth config
+        if (err && /404|not found|cannot post/i.test(err.message || '')) {
+          loadRuntimeAuthConfig(function () {
+            signInViaSupabaseDirect(email, pw, finishLogin, failLogin);
+          });
+          return;
+        }
+        failLogin((err && err.message) || 'Invalid email or password.');
+      });
     });
   }
 
@@ -764,7 +824,7 @@
     $('pf-active').checked = p ? (p.isActive !== false) : true;
 
     // ── Image fields ──────────────────────────────────────────────────────
-    var imageUrl = p ? (p.imageUrl || p.image || p.primaryImage || '') : '';
+    var imageUrl = p ? (p.imageUrl || (p.images && p.images[0] && p.images[0].imageUrl) || p.image || p.primaryImage || '') : '';
     var urlInput = $('pf-image-url');
     var fileInput = $('pf-image-file');
     var previewWrap = $('pf-img-preview-wrap');
@@ -1389,6 +1449,7 @@
           '<td><span class="badge ' + statusClass + '">' + esc(s.status) + '</span></td>' +
           '<td class="text-muted text-sm">' + fmtDate(s.createdAt) + '</td>' +
           '<td><div style="display:flex;gap:6px;">' +
+          '<button class="btn btn-sm btn-ghost" onclick="printSaleBill(\'' + s.id + '\')" title="View / Print Bill">🖨️ Bill</button>' +
           '<button class="btn btn-sm btn-ghost" onclick="editSale(\'' + s.id + '\')">Edit</button>' +
           '<button class="btn btn-sm btn-danger" onclick="deleteSale(\'' + s.id + '\',\'' + esc(s.saleNumber) + '\')">Del</button>' +
           '</div></td></tr>';
@@ -1397,6 +1458,54 @@
     });
   }
   window.loadSales = loadSales;
+
+  window.printSaleBill = function (id) {
+    api('GET', '/admin/sales/' + id, null, function (err, data) {
+      if (err) { toast('Failed to load bill: ' + err.message, 'error'); return; }
+      var s = (data && data.data) || data || {};
+      var items = s.items || [];
+      var rows = items.map(function (it, idx) {
+        var lineTotal = (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0);
+        return '<tr>' +
+          '<td style="padding:8px;border-bottom:1px solid #ddd;">' + (idx + 1) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid #ddd;"><strong>' + esc(it.productName) + '</strong>' + (it.productCode ? '<br><small style="color:#666;">Code: ' + esc(it.productCode) + '</small>' : '') + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">' + esc(it.quantity) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">' + fmtPrice(it.unitPrice) + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;font-weight:600;">' + fmtPrice(lineTotal) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var win = window.open('', '_blank', 'width=820,height=760');
+      if (!win) { toast('Please allow popups to print bills.', 'warning'); return; }
+      var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ' + esc(s.saleNumber) + ' - Neha Crockery House</title>' +
+        '<style>body{font-family:Arial,sans-serif;color:#1a2744;margin:28px;line-height:1.5}' +
+        '.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a2744;padding-bottom:14px;margin-bottom:16px}' +
+        '.badge{display:inline-block;padding:4px 10px;border-radius:4px;background:#e6f4ea;color:#137333;font-weight:700;font-size:12px}' +
+        '.pickup{background:#fff8e6;border:1px solid #e6c97a;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:13px}' +
+        'table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#1a2744;color:#fff;padding:8px;text-align:left;font-size:13px}' +
+        '@media print{.no-print{display:none}}</style></head><body>' +
+        '<div class="no-print" style="text-align:right;margin-bottom:12px;"><button onclick="window.print()" style="padding:8px 16px;background:#1a2744;color:#fff;border:0;border-radius:4px;cursor:pointer;font-weight:600;">🖨️ Print / Save Bill PDF</button></div>' +
+        '<div class="hdr"><div><h2 style="margin:0 0 4px;">Neha Crockery House</h2>' +
+        '<div style="font-size:12px;color:#444;">13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai, Tamil Nadu 600003<br>Phone: +91 97102 54681</div></div>' +
+        '<div style="text-align:right;"><div style="font-size:11px;color:#666;text-transform:uppercase;">Official Admin &amp; Customer Bill</div>' +
+        '<div style="font-size:18px;font-weight:700;color:#1a2744;margin:2px 0;">' + esc(s.saleNumber) + '</div>' +
+        '<div style="font-size:12px;color:#555;">Date: ' + esc(fmtDateTime(s.createdAt)) + '</div>' +
+        '<div class="badge" style="margin-top:4px;">Status: ' + esc(s.status) + '</div></div></div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;">' +
+        '<div><strong>Billed To:</strong><br>' + esc(s.customerName) + (s.companyName ? ' (' + esc(s.companyName) + ')' : '') +
+        (s.phone ? '<br>Phone: ' + esc(s.phone) : '') + (s.email ? '<br>Email: ' + esc(s.email) : '') + '</div>' +
+        '<div style="text-align:right;"><strong>Fulfillment:</strong> Store Pickup Only (No Delivery)<br>' +
+        (s.notes ? '<small style="color:#555;">' + esc(s.notes) + '</small>' : '') + '</div></div>' +
+        '<div class="pickup"><strong>🏪 STORE PICKUP ONLY (NO DELIVERY OPTION):</strong> Showroom pickup at 13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai – 600003.</div>' +
+        '<table><thead><tr><th>#</th><th>Product Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+        '<tfoot><tr><td colspan="4" style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">Grand Total:</td><td style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">' + fmtPrice(s.totalAmount) + '</td></tr></tfoot></table>' +
+        '</body></html>';
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    });
+  };
 
   window.editSale = function (id) {
     api('GET', '/admin/sales/' + id, null, function (err, data) {
@@ -1761,34 +1870,40 @@
 
       var method = id ? 'PUT' : 'POST';
       var path = id ? '/admin/products/' + id : '/admin/products';
-      api(method, path, body, function (err) {
+      api(method, path, body, function (err, data) {
+        if (err) {
+          btn.disabled = false; btn.textContent = 'Save Product';
+          $('product-form-error').textContent = err.message;
+          return;
+        }
+        var savedProduct = (data && data.data) || data;
+        var productId = id || (savedProduct && savedProduct.id);
+
+        if (hasFile && productId) {
+          var fd = new FormData();
+          fd.append('images', fileInput.files[0]);
+          api('POST', '/admin/products/' + productId + '/images', fd, function (uploadErr) {
+            btn.disabled = false; btn.textContent = 'Save Product';
+            if (uploadErr) {
+              toast('Product saved, but image upload failed: ' + uploadErr.message, 'warning');
+            } else {
+              toast(id ? 'Product & image updated!' : 'Product & image created!', 'success');
+            }
+            closeModal('product-modal');
+            loadProducts(state.pages.products);
+          }, true);
+          return;
+        }
+
         btn.disabled = false; btn.textContent = 'Save Product';
-        if (err) { $('product-form-error').textContent = err.message; return; }
         toast(id ? 'Product updated!' : 'Product created!', 'success');
         closeModal('product-modal');
         loadProducts(state.pages.products);
       });
     }
 
-    if (hasFile) {
-      // Upload image first, then save product with returned URL
-      var fd = new FormData();
-      fd.append('file', fileInput.files[0]);
-      api('POST', '/admin/upload/image', fd, function (err, data) {
-        if (err) {
-          // If dedicated upload endpoint doesn't exist, fall back to URL-only save
-          toast('Image upload failed (' + err.message + '), saving without image.', 'warning');
-          doSave(urlInput ? urlInput.value.trim() || undefined : undefined);
-          return;
-        }
-        var uploadedUrl = (data && (data.url || data.imageUrl || data.path)) || '';
-        doSave(uploadedUrl || (urlInput ? urlInput.value.trim() : '') || undefined);
-      }, true);
-    } else {
-      // No file — use URL field value (or undefined to leave image unchanged)
-      var rawUrl = urlInput ? urlInput.value.trim() : '';
-      doSave(rawUrl || undefined);
-    }
+    var rawUrl = urlInput ? urlInput.value.trim() : '';
+    doSave(!hasFile && rawUrl ? rawUrl : undefined);
   }
 
 

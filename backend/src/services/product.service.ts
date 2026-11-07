@@ -184,6 +184,7 @@ export async function getProductById(id: string) {
 // ── ADMIN: Create product ─────────────────────────────────────────────────────
 export async function createProduct(data: CreateProductInput) {
   const slug = await generateUniqueSlug(data.name, "product");
+  const cleanImageUrl = data.imageUrl?.trim() || null;
 
   const product = await prisma.product.create({
     data: {
@@ -216,6 +217,17 @@ export async function createProduct(data: CreateProductInput) {
       isActive: data.isActive ?? true,
       seoTitle: data.seoTitle ?? null,
       seoDescription: data.seoDescription ?? null,
+      ...(cleanImageUrl && {
+        images: {
+          create: [
+            {
+              imageUrl: cleanImageUrl,
+              altText: data.name,
+              sortOrder: 0,
+            },
+          ],
+        },
+      }),
     },
     select: productPublicSelect,
   });
@@ -234,6 +246,35 @@ export async function updateProduct(id: string, data: UpdateProductInput) {
   let slug = existing.slug;
   if (data.name && data.name !== existing.name) {
     slug = await generateUniqueSlug(data.name, "product", id);
+  }
+
+  if (data.imageUrl !== undefined) {
+    const cleanImageUrl = data.imageUrl?.trim() || null;
+    const primaryImage = await prisma.productImage.findFirst({
+      where: { productId: id },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true },
+    });
+
+    if (cleanImageUrl) {
+      if (primaryImage) {
+        await prisma.productImage.update({
+          where: { id: primaryImage.id },
+          data: { imageUrl: cleanImageUrl, altText: data.name ?? existing.name },
+        });
+      } else {
+        await prisma.productImage.create({
+          data: {
+            productId: id,
+            imageUrl: cleanImageUrl,
+            altText: data.name ?? existing.name,
+            sortOrder: 0,
+          },
+        });
+      }
+    } else if (primaryImage && data.imageUrl === null) {
+      await prisma.productImage.delete({ where: { id: primaryImage.id } });
+    }
   }
 
   const product = await prisma.product.update({

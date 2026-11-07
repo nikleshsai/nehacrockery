@@ -64,6 +64,34 @@ export default function SalesPage() {
     }
   };
 
+  const printBill = (s: Sale) => {
+    const win = window.open('', '_blank', 'width=820,height=760');
+    if (!win) return;
+    const rows = (s.items ?? [])
+      .map(
+        (it, idx) =>
+          `<tr><td style="padding:8px;border-bottom:1px solid #ddd;">${idx + 1}</td>` +
+          `<td style="padding:8px;border-bottom:1px solid #ddd;"><strong>${it.productName}</strong>${it.productCode ? `<br><small style="color:#666;">Code: ${it.productCode}</small>` : ''}</td>` +
+          `<td style="padding:8px;border-bottom:1px solid #ddd;text-align:center;">${it.quantity}</td>` +
+          `<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;">₹${Number(it.unitPrice || 0).toLocaleString('en-IN')}</td>` +
+          `<td style="padding:8px;border-bottom:1px solid #ddd;text-align:right;font-weight:600;">₹${(Number(it.quantity || 1) * Number(it.unitPrice || 0)).toLocaleString('en-IN')}</td></tr>`,
+      )
+      .join('');
+    win.document.open();
+    win.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ${s.saleNumber} - Neha Crockery House</title>` +
+        `<style>body{font-family:Arial,sans-serif;color:#1a2744;margin:28px;line-height:1.5}.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #1a2744;padding-bottom:14px;margin-bottom:16px}.pickup{background:#fff8e6;border:1px solid #e6c97a;padding:10px 14px;border-radius:6px;margin:14px 0;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:12px}th{background:#1a2744;color:#fff;padding:8px;text-align:left;font-size:13px}@media print{.no-print{display:none}}</style></head><body>` +
+        `<div class="no-print" style="text-align:right;margin-bottom:12px;"><button onclick="window.print()" style="padding:8px 16px;background:#1a2744;color:#fff;border:0;border-radius:4px;cursor:pointer;font-weight:600;">🖨️ Print / Save Bill PDF</button></div>` +
+        `<div class="hdr"><div><h2 style="margin:0 0 4px;">Neha Crockery House</h2><div style="font-size:12px;color:#444;">13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai, Tamil Nadu 600003<br>Phone: +91 97102 54681</div></div>` +
+        `<div style="text-align:right;"><div style="font-size:11px;color:#666;text-transform:uppercase;">Official Admin & Customer Bill</div><div style="font-size:18px;font-weight:700;color:#1a2744;margin:2px 0;">${s.saleNumber}</div><div style="font-size:12px;color:#555;">Date: ${new Date(s.createdAt).toLocaleString('en-IN')}</div></div></div>` +
+        `<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;"><div><strong>Billed To:</strong><br>${s.customerName}${s.companyName ? ` (${s.companyName})` : ''}${s.phone ? `<br>Phone: ${s.phone}` : ''}</div><div style="text-align:right;"><strong>Fulfillment:</strong> Store Pickup Only (No Delivery)<br><small>${s.notes ?? ''}</small></div></div>` +
+        `<div class="pickup"><strong>🏪 STORE PICKUP ONLY (NO DELIVERY OPTION):</strong> Showroom pickup at 13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai – 600003.</div>` +
+        `<table><thead><tr><th>#</th><th>Product Description</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Amount</th></tr></thead><tbody>${rows}</tbody>` +
+        `<tfoot><tr><td colspan="4" style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">Grand Total:</td><td style="padding:10px 8px;text-align:right;font-weight:700;font-size:15px;">₹${Number(s.totalAmount ?? 0).toLocaleString('en-IN')}</td></tr></tfoot></table></body></html>`,
+    );
+    win.document.close();
+  };
+
   const patch = (i: number, p: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...p } : l)));
 
   return (
@@ -86,7 +114,10 @@ export default function SalesPage() {
                 </Select>
               </td>
               <td className="px-4 py-3 whitespace-nowrap">{new Date(s.createdAt).toLocaleDateString('en-IN')}</td>
-              <td className="px-4 py-3 text-right"><Btn variant="danger" onClick={() => remove(s)}>Delete</Btn></td>
+              <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                <Btn variant="outline" onClick={() => printBill(s)}>Print Bill</Btn>
+                <Btn variant="danger" onClick={() => remove(s)}>Delete</Btn>
+              </td>
             </tr>
           ))}
         </Table>

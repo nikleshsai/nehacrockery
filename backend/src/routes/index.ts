@@ -8,6 +8,7 @@ import adminRoutes from './admin.routes';
 import * as categoryController from '../controllers/category.controller';
 import * as enquiryController from '../controllers/enquiry.controller';
 import * as siteController from '../controllers/site.controller';
+import * as salesController from '../controllers/sales.controller';
 import { validate } from '../middleware/validate';
 import { createEnquirySchema, createCatalogueRequestSchema } from '../validators/enquiry.validator';
 
@@ -49,6 +50,12 @@ router.get('/shop-media', siteController.listShopMedia);
 
 // ── Enquiries (public POST) ───────────────────────────────────────────────────
 router.post('/enquiries', validate(createEnquirySchema), enquiryController.createEnquiry);
+
+// ── Online Orders & Unique Bill Generation (Store Pickup Only) ───────────────
+router.get('/orders/payment-config', salesController.getPaymentConfig);
+router.post('/orders/initiate', salesController.initiateOnlineOrder);
+router.post('/orders/complete', salesController.completeOnlineOrder);
+router.get('/orders/bill/:billNumber', salesController.getBillByNumber);
 
 // ── Catalogue requests (public POST) ─────────────────────────────────────────
 router.post(

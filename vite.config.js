@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
 const CLEAN_PAGES = new Set([
   'about',
@@ -13,9 +13,21 @@ const CLEAN_PAGES = new Set([
   'terms',
 ]);
 
-function vercelRoutingPlugin() {
+function vercelRoutingPlugin(env = {}) {
+  const supabaseUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
+  const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '';
   return {
     name: 'vercel-routing-compat',
+    transformIndexHtml(html) {
+      if (!supabaseUrl && !supabaseAnonKey) return html;
+      const metaTags = [
+        supabaseUrl ? `<meta name="supabase-url" content="${supabaseUrl}">` : '',
+        supabaseAnonKey ? `<meta name="supabase-anon-key" content="${supabaseAnonKey}">` : '',
+      ]
+        .filter(Boolean)
+        .join('\n  ');
+      return html.replace('</head>', `  ${metaTags}\n</head>`);
+    },
     resolveId(id) {
       if (id.startsWith('/scripts/') || id.startsWith('/styles/') || id.startsWith('/assets/')) {
         return path.resolve(process.cwd(), 'frontend', id.slice(1));
@@ -71,47 +83,53 @@ function vercelRoutingPlugin() {
   };
 }
 
-export default defineConfig({
-  // Serve from project root — frontend/ and admin/ are sub-directories
-  root: '.',
-  plugins: [vercelRoutingPlugin()],
-  server: {
-    port: 3000,
-    open: '/',
-    // ── Dev proxy: forward API & upload requests to the backend server ──────
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/uploads': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        secure: false,
+export default defineConfig(({ mode }) => {
+  const rootEnv = loadEnv(mode, process.cwd(), '');
+  const backendEnv = loadEnv(mode, path.resolve(process.cwd(), 'backend'), '');
+  const mergedEnv = { ...backendEnv, ...rootEnv, ...process.env };
+
+  return {
+    // Serve from project root — frontend/ and admin/ are sub-directories
+    root: '.',
+    plugins: [vercelRoutingPlugin(mergedEnv)],
+    server: {
+      port: 3000,
+      open: '/',
+      // ── Dev proxy: forward API & upload requests to the backend server ──────
+      proxy: {
+        '/api': {
+          target: 'http://localhost:4000',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/uploads': {
+          target: 'http://localhost:4000',
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
-  },
-  build: {
-    outDir: 'dist',
-    rollupOptions: {
-      input: {
-        // ── Frontend (customer-facing) pages ──────────────────
-        home: 'frontend/index.html',
-        about: 'frontend/about.html',
-        products: 'frontend/products.html',
-        product: 'frontend/product.html',
-        brands: 'frontend/brands.html',
-        taroba: 'frontend/taroba.html',
-        catalogue: 'frontend/catalogue.html',
-        contact: 'frontend/contact.html',
-        privacy: 'frontend/privacy.html',
-        terms: 'frontend/terms.html',
+    build: {
+      outDir: 'dist',
+      rollupOptions: {
+        input: {
+          // ── Frontend (customer-facing) pages ──────────────────
+          home: 'frontend/index.html',
+          about: 'frontend/about.html',
+          products: 'frontend/products.html',
+          product: 'frontend/product.html',
+          brands: 'frontend/brands.html',
+          taroba: 'frontend/taroba.html',
+          catalogue: 'frontend/catalogue.html',
+          contact: 'frontend/contact.html',
+          privacy: 'frontend/privacy.html',
+          terms: 'frontend/terms.html',
 
-        // ── Admin (internal staff) ────────────────────────────
-        admin: 'admin/index.html'
+          // ── Admin (internal staff) ────────────────────────────
+          admin: 'admin/index.html'
+        }
       }
     }
-  }
+  };
 });
 

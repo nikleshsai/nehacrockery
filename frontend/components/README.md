@@ -39,7 +39,7 @@ Assets path: `assets/images/logo.jpeg`
 
 ### Floating WhatsApp Button
 ```html
-<a href="https://wa.me/918870413413" class="float-whatsapp" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+<a href="https://wa.me/919710254681" class="float-whatsapp" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
   [whatsapp svg]
 </a>
 ```

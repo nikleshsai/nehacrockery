@@ -293,7 +293,7 @@
 (function () {
   'use strict';
 
-  var WA_NUMBER = '918870413413';
+  var WA_NUMBER = '919710254681';
   // Use relative URL when served from backend, absolute for file:// fallback
   var API_BASE = '/api/v1';
 
@@ -905,105 +905,225 @@
 
   var SETTINGS_API = '/api/v1/site-settings';
   var SETTINGS_CACHE_KEY = 'nch_site_settings';
+  var SETTINGS_VERSION_KEY = 'nch_settings_version';
   var SETTINGS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  function formatIndianDisplay(digits12, fallbackRaw) {
+    if (digits12 && digits12.length === 12) {
+      return '+91 ' + digits12.slice(2, 7) + ' ' + digits12.slice(7);
+    }
+    return fallbackRaw || '';
+  }
 
   function applySettings(s) {
     if (!s) return;
-    var phone = s.phone || '';
+    window.__NCH_SITE_SETTINGS__ = s;
+
+    var phone = s.phone || s.whatsapp || '';
     var whatsapp = s.whatsapp || s.phone || '';
     var waNumber = whatsapp.replace(/\D/g, '');
     if (waNumber.length === 10) waNumber = '91' + waNumber;
     var telNumber = phone.replace(/\D/g, '');
     if (telNumber.length === 10) telNumber = '91' + telNumber;
     if (!telNumber) telNumber = waNumber;
-    var phoneDisplay = telNumber.length === 12 ? '+91 ' + telNumber.slice(2, 7) + ' ' + telNumber.slice(7) : phone;
-    var whatsapp = s.whatsapp || s.phone || '';
-    var waNumber = whatsapp.replace(/\D/g, '');
-    if (waNumber.length === 10) waNumber = '91' + waNumber;
+    if (!waNumber) waNumber = telNumber;
 
-    // Update every WhatsApp href
-    document.querySelectorAll('a[href*="wa.me"]').forEach(function (el) {
-      var existing = el.getAttribute('href') || '';
-      var qIdx = existing.indexOf('?');
-      var qs = qIdx !== -1 ? existing.slice(qIdx) : '';
-      el.setAttribute('href', 'https://wa.me/' + waNumber + qs);
-    });
+    var phoneDisplay = formatIndianDisplay(telNumber, phone);
+    var waDisplay = formatIndianDisplay(waNumber, whatsapp);
 
-    // Update every tel: link
-    document.querySelectorAll('a[href^="tel:"]').forEach(function (el) {
-      el.setAttribute('href', 'tel:+' + telNumber);
-      if (phoneDisplay) {
-        el.setAttribute('title', 'Call ' + phoneDisplay);
-      }
-      var txt = el.textContent.trim();
-      if (/^\+?[\d\s\-()\u00a0]{7,}$/.test(txt) && phoneDisplay) {
-        el.textContent = phoneDisplay;
-      } else if (/^Call(\s+\+?[\d\s\-()\u00a0]+|\s+Now)/i.test(txt) && phoneDisplay) {
-        el.textContent = 'Call ' + phoneDisplay + ' \u2192';
-      }
-    });
+    // 1. Update every WhatsApp href AND visible WhatsApp number text
+    if (waNumber) {
+      document.querySelectorAll('a[href*="wa.me"]').forEach(function (el) {
+        var existing = el.getAttribute('href') || '';
+        var qIdx = existing.indexOf('?');
+        var qs = qIdx !== -1 ? existing.slice(qIdx) : '';
+        el.setAttribute('href', 'https://wa.me/' + waNumber + qs);
 
-    // Update contact-phone-link text
+        var txt = (el.textContent || '').trim();
+        if (el.getAttribute('data-contact') === 'whatsapp') {
+          el.textContent = /^WhatsApp/i.test(txt) ? 'WhatsApp ' + waDisplay : waDisplay;
+        } else if (/^WhatsApp\s+\+?[\d\s\-()\u00a0]{7,}$/i.test(txt) && waDisplay) {
+          el.textContent = 'WhatsApp ' + waDisplay;
+        } else if (/^\+?[\d\s\-()\u00a0]{7,}$/.test(txt) && waDisplay) {
+          el.textContent = waDisplay;
+        }
+      });
+      document.body.dataset.waNumber = waNumber;
+    }
+
+    // 2. Update every tel: link href, title, and visible phone text
+    if (telNumber) {
+      document.querySelectorAll('a[href^="tel:"]').forEach(function (el) {
+        el.setAttribute('href', 'tel:+' + telNumber);
+        if (phoneDisplay) {
+          el.setAttribute('title', 'Call ' + phoneDisplay);
+        }
+        var txt = (el.textContent || '').trim();
+        if (el.getAttribute('data-contact') === 'phone' && phoneDisplay) {
+          el.textContent = phoneDisplay;
+        } else if (/^\+?[\d\s\-()\u00a0]{7,}$/.test(txt) && phoneDisplay) {
+          el.textContent = phoneDisplay;
+        } else if (/^Call(\s+\+?[\d\s\-()\u00a0]+|\s+Now)/i.test(txt) && phoneDisplay) {
+          el.textContent = 'Call ' + phoneDisplay + ' \u2192';
+        }
+      });
+      document.body.dataset.phoneDisplay = phoneDisplay;
+    }
+
+    // Update contact-phone-link text explicitly
     var phoneLink = document.getElementById('contact-phone-link');
     if (phoneLink && phoneDisplay) {
       phoneLink.textContent = phoneDisplay;
       phoneLink.setAttribute('href', 'tel:+' + telNumber);
     }
 
-    // Update address
-    if (s.address) {
-      document.querySelectorAll('[data-dynamic="address"]').forEach(function (el) { el.textContent = s.address; });
-      document.querySelectorAll('.contact-card-text').forEach(function (el) {
-        if (el.closest('#contact-address-card')) el.innerHTML = s.address.replace(/,\s*/g, ',<br />');
+    // 3. Update Business Name & Tagline
+    if (s.businessName) {
+      document.querySelectorAll('[data-dynamic="business-name"]').forEach(function (el) {
+        el.textContent = s.businessName;
       });
-      document.querySelectorAll('.map-address').forEach(function (el) { el.textContent = s.address; });
+      var bName = s.businessName.trim();
+      var mainPart = bName;
+      var subPart = '';
+      if (/\s+House$/i.test(bName)) {
+        mainPart = bName.replace(/\s+House$/i, '');
+        subPart = 'House';
+      }
+      document.querySelectorAll('.logo-text').forEach(function (el) {
+        var nameEl = el.querySelector('.logo-name');
+        var tagEl = el.querySelector('.logo-tagline');
+        if (nameEl) nameEl.textContent = mainPart;
+        if (tagEl) tagEl.textContent = subPart;
+      });
+      document.querySelectorAll('.footer-logo-text').forEach(function (el) {
+        var nameEl = el.querySelector('.footer-logo-name');
+        var subEl = el.querySelector('.footer-logo-sub');
+        if (nameEl) nameEl.textContent = mainPart;
+        if (subEl) subEl.textContent = subPart;
+      });
     }
 
-    // Update Google Maps links
+    if (s.tagline) {
+      document.querySelectorAll('[data-dynamic="tagline"]').forEach(function (el) {
+        el.textContent = s.tagline;
+      });
+    }
+
+    // 4. Update Office & Warehouse Address
+    if (s.address) {
+      document.querySelectorAll('[data-dynamic="address"]').forEach(function (el) {
+        el.textContent = s.address;
+      });
+      document.querySelectorAll('.contact-card-text').forEach(function (el) {
+        if (el.closest('#contact-address-card')) {
+          el.innerHTML = s.address.replace(/,\s*/g, ',<br />');
+        }
+      });
+      document.querySelectorAll('.map-address').forEach(function (el) {
+        el.textContent = s.address;
+      });
+      document.body.dataset.pickupAddress = s.address;
+
+      if (!s.googleMapsUrl) {
+        var mapSearch = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address);
+        document.querySelectorAll('a[href*="google.com/maps/search"]').forEach(function (el) {
+          el.setAttribute('href', mapSearch);
+        });
+        document.querySelectorAll('iframe.map-embed').forEach(function (iframe) {
+          iframe.setAttribute('src', 'https://www.google.com/maps?q=' + encodeURIComponent(s.address) + '&output=embed');
+        });
+      }
+    }
+
+    if (s.warehouseAddress) {
+      document.querySelectorAll('[data-dynamic="warehouse-address"]').forEach(function (el) {
+        el.textContent = s.warehouseAddress;
+      });
+    }
+
+    // 5. Update Google Maps links
     if (s.googleMapsUrl) {
       document.querySelectorAll('a[href*="google.com/maps"], a[href*="maps.google"], a[href*="goo.gl/maps"]').forEach(function (el) {
         el.setAttribute('href', s.googleMapsUrl);
       });
     }
 
-    // Update business hours
+    // 6. Update Business Hours
     if (s.businessHours) {
-      document.querySelectorAll('[data-dynamic="hours"]').forEach(function (el) { el.textContent = s.businessHours; });
+      document.querySelectorAll('[data-dynamic="hours"]').forEach(function (el) {
+        el.textContent = s.businessHours;
+      });
+      var hoursCard = document.getElementById('contact-hours-card');
+      if (hoursCard) {
+        var hoursText = hoursCard.querySelector('.contact-card-text');
+        if (hoursText) {
+          hoursText.textContent = s.businessHours;
+        }
+      }
     }
 
-    // Update email
+    // 7. Update Email
     if (s.email) {
-      document.querySelectorAll('a[href^="mailto:"]').forEach(function (el) {
-        el.setAttribute('href', 'mailto:' + s.email);
-        if (el.textContent.trim().includes('@')) el.textContent = s.email;
+      document.querySelectorAll('a[href^="mailto:"], [data-contact="email"]').forEach(function (el) {
+        if (el.tagName === 'A') el.setAttribute('href', 'mailto:' + s.email);
+        if ((el.textContent || '').trim().includes('@') || el.getAttribute('data-contact') === 'email') {
+          el.textContent = s.email;
+        }
       });
     }
 
-    // Store WA number for forms
-    document.body.dataset.waNumber = waNumber;
+    // 8. Update GST / PAN / Social links if present
+    if (s.gstNumber) {
+      document.querySelectorAll('[data-dynamic="gst"]').forEach(function (el) { el.textContent = s.gstNumber; });
+    }
+    if (s.panNumber) {
+      document.querySelectorAll('[data-dynamic="pan"]').forEach(function (el) { el.textContent = s.panNumber; });
+    }
+    if (s.instagram) {
+      document.querySelectorAll('a[data-dynamic="instagram"]').forEach(function (el) { el.setAttribute('href', s.instagram); });
+    }
+    if (s.facebook) {
+      document.querySelectorAll('a[data-dynamic="facebook"]').forEach(function (el) { el.setAttribute('href', s.facebook); });
+    }
+    if (s.youtube) {
+      document.querySelectorAll('a[data-dynamic="youtube"]').forEach(function (el) { el.setAttribute('href', s.youtube); });
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('nch:settings-updated', { detail: s }));
+    } catch (e) {}
   }
 
-  function loadSettings() {
-    try {
-      var raw = sessionStorage.getItem(SETTINGS_CACHE_KEY);
-      if (raw) {
-        var cached = JSON.parse(raw);
-        if (cached && cached.ts && (Date.now() - cached.ts < SETTINGS_CACHE_TTL)) {
-          applySettings(cached.data);
-          return;
-        }
-      }
-    } catch (e) {}
-
-    fetch(SETTINGS_API)
+  function fetchFreshSettings() {
+    fetch(SETTINGS_API, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (resp) {
         if (!resp || !resp.data) return;
         var s = resp.data;
         applySettings(s);
-        try { sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: s })); } catch (e) {}
+        var ver = '';
+        try { ver = localStorage.getItem(SETTINGS_VERSION_KEY) || ''; } catch (e) {}
+        try {
+          sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify({ ts: Date.now(), ver: ver, data: s }));
+        } catch (e) {}
       })
       .catch(function () {});
+  }
+
+  function loadSettings() {
+    try {
+      var raw = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+      var currentVer = localStorage.getItem(SETTINGS_VERSION_KEY) || '';
+      if (raw) {
+        var cached = JSON.parse(raw);
+        if (cached && cached.data && (!currentVer || cached.ver === currentVer) && (Date.now() - (cached.ts || 0) < SETTINGS_CACHE_TTL)) {
+          applySettings(cached.data);
+        }
+      }
+    } catch (e) {}
+
+    // Always revalidate from backend so admin setting updates reflect immediately
+    fetchFreshSettings();
   }
 
   if (document.readyState === 'loading') {
@@ -1014,17 +1134,9 @@
 
   // Listen for admin settings save (cross-tab via localStorage)
   window.addEventListener('storage', function (e) {
-    if (e.key === 'nch_settings_version') {
-      // Admin saved new settings — bust sessionStorage cache and re-fetch
+    if (e.key === SETTINGS_VERSION_KEY) {
       try { sessionStorage.removeItem(SETTINGS_CACHE_KEY); } catch (ex) {}
-      fetch(SETTINGS_API)
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (resp) {
-          if (!resp || !resp.data) return;
-          applySettings(resp.data);
-          try { sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: resp.data })); } catch (ex) {}
-        })
-        .catch(function () {});
+      fetchFreshSettings();
     }
   });
 

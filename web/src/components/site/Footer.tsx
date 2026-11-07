@@ -82,7 +82,7 @@ export function Footer() {
             </ul>
             <h4 className="footer-col-title" style={{ marginTop: 24 }}>Opening Hours</h4>
             <p className="footer-hours">
-              Mon &ndash; Sat: 10:30 AM &ndash; 7:30 PM
+              {c.hours}
               <br />
               <span className="closed-text">Sunday: Closed</span>
             </p>
@@ -93,8 +93,8 @@ export function Footer() {
       <div className="footer-bottom">
         <div className="container footer-bottom-inner">
           <p className="footer-copy">
-            &copy; {new Date().getFullYear()} Neha Crockery House. All rights reserved. &nbsp;|&nbsp; Taroba is the
-            in-house brand of Neha Crockery House.
+            &copy; {new Date().getFullYear()} {c.businessName}. All rights reserved. &nbsp;|&nbsp; Taroba is the
+            in-house brand of {c.businessName}.
           </p>
           <p className="footer-location">Park Town, Chennai, Tamil Nadu</p>
         </div>

@@ -44,3 +44,25 @@ export async function adminGetSaleStats(_req: Request, res: Response): Promise<v
   const stats = await salesService.getSaleStats();
   sendSuccess(res, stats);
 }
+
+// ── PUBLIC ONLINE CHECKOUT & BILL ENDPOINTS ──────────────────────────────────
+
+export async function getPaymentConfig(_req: Request, res: Response): Promise<void> {
+  const cfg = await salesService.getPaymentConfig();
+  sendSuccess(res, cfg);
+}
+
+export async function initiateOnlineOrder(req: Request, res: Response): Promise<void> {
+  const result = await salesService.initiateOnlineOrder(req.body);
+  sendSuccess(res, result, 'Order payment initialized');
+}
+
+export async function completeOnlineOrder(req: Request, res: Response): Promise<void> {
+  const result = await salesService.completeOnlineOrder(req.body);
+  sendCreated(res, result, `Order confirmed. Bill ${result.billNumber} generated.`);
+}
+
+export async function getBillByNumber(req: Request, res: Response): Promise<void> {
+  const result = await salesService.getBillByNumber(req.params.billNumber);
+  sendSuccess(res, result);
+}

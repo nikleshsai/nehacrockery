@@ -38,9 +38,13 @@ export default function SettingsPage() {
     const { id: _id, ...body } = form;
     void _id;
     try {
-      await adminRequest('/admin/settings', { method: 'PUT', body });
-      try { sessionStorage.removeItem('nch_site_settings'); } catch { /* ignore */ }
-      setMsg({ ok: true, text: 'Settings saved.' });
+      const res = await adminRequest<SiteSettings>('/admin/settings', { method: 'PUT', body });
+      try {
+        const ver = String(Date.now());
+        localStorage.setItem('nch_settings_version', ver);
+        sessionStorage.setItem('nch_site_settings', JSON.stringify({ ts: Date.now(), ver, data: res.data ?? body }));
+      } catch { /* ignore */ }
+      setMsg({ ok: true, text: 'Settings saved! All website pages will update immediately.' });
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message : 'Save failed' });
     }

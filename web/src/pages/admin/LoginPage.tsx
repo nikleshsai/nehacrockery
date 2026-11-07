@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Seo } from '@/components/Seo';
 import { useAuth } from '@/lib/auth';
-import { isSupabaseConfigured } from '@/lib/supabase';
 
 export default function LoginPage() {
   const { user, loading, signIn, error: authError } = useAuth();
@@ -48,16 +47,9 @@ export default function LoginPage() {
           </p>
           <h1 className="font-serif text-3xl font-semibold text-navy">Admin Sign In</h1>
           <p className="text-xs text-charcoal-lt mt-1">
-            Sign in with your Supabase administrator account
+            Sign in with your administrator account
           </p>
         </div>
-
-        {!isSupabaseConfigured && (
-          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-            <strong>Supabase env not configured:</strong> Set <code>VITE_SUPABASE_URL</code> and{' '}
-            <code>VITE_SUPABASE_ANON_KEY</code> in <code>web/.env</code>.
-          </div>
-        )}
 
         {(formError || authError) && (
           <div
