@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Seo } from '@/components/Seo';
 import { ProductCard } from '@/components/site/ProductCard';
 import { WhatsAppIcon } from '@/components/site/WhatsAppIcon';
-import { useAllProducts } from '@/lib/hooks';
+import { useAllProducts, useCategories } from '@/lib/hooks';
 import { useContact } from '@/lib/settings';
 
 const PAGE_SIZE = 12;
@@ -116,6 +116,74 @@ export default function ProductsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { data: allProducts, loading, error, retry } = useAllProducts();
+  const { data: apiCategories } = useCategories();
+
+  const { dynamicChips, categoryOrderMap } = useMemo(() => {
+    const orderMap: Record<string, number> = {
+      crockery: 1,
+      'crockery-dinnerware': 1,
+      cutlery: 2,
+      glassware: 3,
+      'glassware-bottles': 3,
+      melamineware: 4,
+      acrylicware: 5,
+      kitchenware: 6,
+      hotelware: 7,
+      'hotelware-institutional-supply': 7,
+      'wooden-handicrafts': 8,
+      'new-arrivals': 9,
+    };
+
+    const activeCats = (apiCategories ?? [])
+      .filter((cat) => cat && cat.isActive !== false)
+      .slice()
+      .sort((a, b) => {
+        const sa = typeof a.sortOrder === 'number' ? a.sortOrder : 99;
+        const sb = typeof b.sortOrder === 'number' ? b.sortOrder : 99;
+        if (sa !== sb) return sa - sb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+    if (activeCats.length === 0) {
+      return { dynamicChips: CHIPS, categoryOrderMap: orderMap };
+    }
+
+    const iconBySlug = new Map<string, ReactNode>();
+    CHIPS.forEach((ch) => {
+      if (ch.icon) iconBySlug.set(ch.slug, ch.icon);
+    });
+
+    const list: CategoryChipDef[] = [{ slug: 'all', label: 'All Products', id: 'chip-all' }];
+    let hasNew = false;
+
+    activeCats.forEach((cat, idx) => {
+      const rawSlug = (cat.slug || '').toLowerCase().trim();
+      const normSlug = normalizeCategorySlug(rawSlug);
+      const sortVal = typeof cat.sortOrder === 'number' ? cat.sortOrder : idx + 1;
+      orderMap[rawSlug] = sortVal;
+      orderMap[normSlug] = sortVal;
+      if (normSlug === 'new-arrivals') hasNew = true;
+      list.push({
+        slug: normSlug,
+        label: cat.name,
+        id: `chip-${normSlug}`,
+        isNew: normSlug === 'new-arrivals',
+        icon: iconBySlug.get(normSlug),
+      });
+    });
+
+    if (!hasNew) {
+      list.push({
+        slug: 'new-arrivals',
+        label: 'New Arrivals',
+        id: 'chip-new',
+        isNew: true,
+        icon: iconBySlug.get('new-arrivals'),
+      });
+    }
+
+    return { dynamicChips: list, categoryOrderMap: orderMap };
+  }, [apiCategories]);
 
   const selectCategory = (slug: string) => {
     setCurrentPage(1);
@@ -148,12 +216,15 @@ export default function ProductsPage() {
             rawCat === activeCategory.toLowerCase() ||
             rawCat.startsWith(`${normActiveCat}-`));
 
-      const brandName = (p.brand?.name || '').toLowerCase();
-      const brandSlug = (p.brand?.slug || '').toLowerCase();
+      const brandName = (p.brand?.name || '').toLowerCase().trim();
+      const brandSlug = (p.brand?.slug || brandName.replace(/[^a-z0-9]+/g, '-')).toLowerCase().trim();
+      const activeBrandNorm = activeBrand.toLowerCase().trim();
+      const activeBrandSlug = activeBrandNorm.replace(/[^a-z0-9]+/g, '-');
       const matchBrand =
         !activeBrand ||
-        brandName === activeBrand.toLowerCase() ||
-        brandSlug === activeBrand.toLowerCase();
+        brandName === activeBrandNorm ||
+        brandSlug === activeBrandNorm ||
+        brandSlug === activeBrandSlug;
 
       const matchSearch =
         !term ||
@@ -167,20 +238,44 @@ export default function ProductsPage() {
       return matchCat && matchBrand && matchSearch;
     });
 
+    const getCatOrder = (p: (typeof filtered)[number]): number => {
+      const raw = (p.category?.slug || '').toLowerCase();
+      const norm = normalizeCategorySlug(raw);
+      if (categoryOrderMap[raw] !== undefined) return categoryOrderMap[raw];
+      if (categoryOrderMap[norm] !== undefined) return categoryOrderMap[norm];
+      if (typeof p.category?.sortOrder === 'number') return p.category.sortOrder;
+      return 99;
+    };
+
     const sorted = [...filtered];
     if (sortOrder === 'name-asc' || sortOrder === 'name-az') {
       sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     } else if (sortOrder === 'name-desc' || sortOrder === 'name-za') {
       sorted.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    } else if (sortOrder === 'category') {
+      sorted.sort((a, b) => {
+        const ca = getCatOrder(a);
+        const cb = getCatOrder(b);
+        if (ca !== cb) return ca - cb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
     } else if (sortOrder === 'new') {
       sorted.sort((a, b) => (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0));
     } else if (sortOrder === 'brand') {
       sorted.sort((a, b) => (a.brand?.name || '').localeCompare(b.brand?.name || ''));
     } else {
-      sorted.sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0));
+      sorted.sort((a, b) => {
+        const fa = a.isFeatured ? 1 : 0;
+        const fb = b.isFeatured ? 1 : 0;
+        if (fb !== fa) return fb - fa;
+        const ca = getCatOrder(a);
+        const cb = getCatOrder(b);
+        if (ca !== cb) return ca - cb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
     }
     return sorted;
-  }, [allProducts, activeCategory, activeBrand, searchTerm, sortOrder]);
+  }, [allProducts, activeCategory, activeBrand, searchTerm, sortOrder, categoryOrderMap]);
 
   const total = filteredProducts.length;
   const pageProducts = filteredProducts.slice(0, currentPage * PAGE_SIZE);
@@ -237,18 +332,19 @@ export default function ProductsPage() {
                   setCurrentPage(1);
                 }}
               >
-                <option value="default">Sort: Featured</option>
+                <option value="default">Sort: Featured &amp; Category</option>
+                <option value="category">Category (Admin Order)</option>
                 <option value="name-az">Name A – Z</option>
                 <option value="name-za">Name Z – A</option>
+                <option value="brand">Brand A – Z</option>
                 <option value="new">New Arrivals First</option>
-                <option value="brand">By Brand</option>
               </select>
             </div>
           </div>
 
           <div className="category-chips" id="category-chips" role="tablist" aria-label="Filter by category">
-            {CHIPS.map((chip) => {
-              const selected = activeCategory === chip.slug;
+            {dynamicChips.map((chip) => {
+              const selected = normalizeCategorySlug(activeCategory) === chip.slug || activeCategory === chip.slug;
               return (
                 <button
                   key={chip.slug}

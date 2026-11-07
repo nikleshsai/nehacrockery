@@ -32,20 +32,32 @@ export default function BrandsPage() {
             <span className="brand-highlight-letter">
               T
             </span>
+            <span className="brand-highlight-badge-sub">EST. 2016</span>
           </div>
           <div className="brand-highlight-text">
             <span className="brand-own-tag">
-              &#9670; OUR OWN BRAND
+              &#9670; OUR FLAGSHIP IN-HOUSE BRAND
             </span>
             <h2 className="brand-highlight-title" id="taroba-brand-heading">
               Taroba
             </h2>
             <p className="brand-highlight-desc">
-              Taroba is the in-house brand of Neha Crockery House, covering crockery &amp; glassware, ceramic products, flasks and cutlery.
+              Taroba is the officially registered in-house brand of Neha Crockery House, crafted for discerning homes, hotels, and banquets — spanning fine crockery &amp; glassware, ceramic dinnerware, vacuum flasks, and stainless steel cutlery.
             </p>
-            <Link to="/taroba" className="btn-primary">
-              Explore Taroba &#8594;
-            </Link>
+            <div className="taroba-categories" style={{ marginBottom: 20 }}>
+              <span className="taroba-cat-tag">Crockery &amp; Glassware</span>
+              <span className="taroba-cat-tag">Ceramic Tableware</span>
+              <span className="taroba-cat-tag">Insulated Flasks</span>
+              <span className="taroba-cat-tag">Stainless Cutlery</span>
+            </div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <Link to="/taroba" className="btn-primary">
+                Explore Taroba &#8594;
+              </Link>
+              <Link to="/products?brand=taroba" className="btn-outline">
+                View Taroba Products
+              </Link>
+            </div>
           </div>
         </div>
       </section>

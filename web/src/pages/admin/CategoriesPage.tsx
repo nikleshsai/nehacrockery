@@ -37,19 +37,45 @@ export default function CategoriesPage() {
     }
   };
 
+  const moveOrder = async (idx: number, delta: number) => {
+    const swapIdx = idx + delta;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= items.length) return;
+    const current = items[idx];
+    const target = items[swapIdx];
+    try {
+      await adminRequest(`/admin/categories/${current.id}`, {
+        method: 'PUT',
+        body: { name: current.name, sortOrder: swapIdx + 1, isActive: current.isActive },
+      });
+      await adminRequest(`/admin/categories/${target.id}`, {
+        method: 'PUT',
+        body: { name: target.name, sortOrder: idx + 1, isActive: target.isActive },
+      });
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reorder failed');
+    }
+  };
+
   return (
     <>
       <PageHeader title="Categories" actions={<Btn onClick={() => setEditing({ isActive: true, sortOrder: 0 })}>+ Add Category</Btn>} />
       {error && <Alert>{error}</Alert>}
       <Card>
-        <Table head={['Name', 'Slug', 'Products', 'Order', 'Status', '']}>
+        <Table head={['Order', 'Name', 'Slug', 'Products', 'Status', '']}>
           {loading && <tr><td className="p-4" colSpan={6}>Loading…</td></tr>}
-          {items.map((c) => (
+          {items.map((c, idx) => (
             <tr key={c.id}>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-xs font-semibold">{c.sortOrder}</span>
+                  <Btn variant="outline" disabled={idx === 0} onClick={() => moveOrder(idx, -1)}>↑</Btn>
+                  <Btn variant="outline" disabled={idx === items.length - 1} onClick={() => moveOrder(idx, 1)}>↓</Btn>
+                </div>
+              </td>
               <td className="px-4 py-3 font-semibold text-navy">{c.name}</td>
               <td className="px-4 py-3">{c.slug}</td>
               <td className="px-4 py-3">{c._count?.products ?? 0}</td>
-              <td className="px-4 py-3">{c.sortOrder}</td>
               <td className="px-4 py-3"><Badge tone={c.isActive ? 'green' : 'neutral'}>{c.isActive ? 'Active' : 'Hidden'}</Badge></td>
               <td className="px-4 py-3 text-right space-x-2">
                 <Btn variant="outline" onClick={() => setEditing(c)}>Edit</Btn>

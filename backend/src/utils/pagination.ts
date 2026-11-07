@@ -12,7 +12,7 @@ export interface PaginationParams {
 export function parsePagination(
   pageStr?: string,
   pageSizeStr?: string,
-  maxPageSize = 100,
+  maxPageSize = 2000,
 ): PaginationParams {
   const page = Math.max(1, parseInt(pageStr ?? '1', 10) || 1);
   const pageSize = Math.min(maxPageSize, Math.max(1, parseInt(pageSizeStr ?? '20', 10) || 20));

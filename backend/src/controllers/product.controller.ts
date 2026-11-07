@@ -32,8 +32,9 @@ export async function getProduct(req: Request, res: Response): Promise<void> {
 // ── ADMIN ─────────────────────────────────────────────────────────────────────
 
 export async function adminListProducts(req: Request, res: Response): Promise<void> {
-  // Admin sees all products (including inactive)
-  const query = { ...req.query, active: 'all' } as never;
+  // Admin sees all products by default, or filtered by active=true/false when requested
+  const activeParam = req.query.active === 'true' || req.query.active === 'false' ? req.query.active : 'all';
+  const query = { ...req.query, active: activeParam } as never;
   const { products, pagination } = await productService.listProducts(query);
   sendPaginated(res, products, pagination);
 }

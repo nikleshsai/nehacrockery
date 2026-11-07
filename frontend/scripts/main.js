@@ -322,15 +322,37 @@
     return s;
   }
 
+  var CATEGORY_SORT_MAP = {
+    crockery: 1,
+    'crockery-dinnerware': 1,
+    cutlery: 2,
+    glassware: 3,
+    'glassware-bottles': 3,
+    melamineware: 4,
+    acrylicware: 5,
+    kitchenware: 6,
+    hotelware: 7,
+    'hotelware-institutional-supply': 7,
+    'wooden-handicrafts': 8,
+    'new-arrivals': 9
+  };
+
   function mapApiProduct(p) {
     var rawCat = (p.category && p.category.slug) || '';
+    var normCat = normalizeCategorySlug(rawCat);
+    var catSort = (p.category && typeof p.category.sortOrder === 'number')
+      ? p.category.sortOrder
+      : (CATEGORY_SORT_MAP[rawCat] || CATEGORY_SORT_MAP[normCat] || 99);
     return {
       id: p.productCode || p.id,
       slug: p.slug || '',
       name: p.name,
       brand: (p.brand && p.brand.name) || '',
-      category: normalizeCategorySlug(rawCat),
+      category: normCat,
       rawCategory: rawCat,
+      categoryName: (p.category && p.category.name) || '',
+      categorySortOrder: catSort,
+      createdAt: p.createdAt || '',
       tags: [
         p.isFeatured ? 'featured' : null,
         p.isNewArrival ? 'new_arrival' : null,
@@ -417,7 +439,7 @@
     var badgesHtml = '';
     if (isFeatured) badgesHtml += '<span class="product-badge product-badge--featured">Featured</span>';
     if (isNew) badgesHtml += '<span class="product-badge product-badge--new">New</span>';
-    var catLabel = CATEGORY_LABELS[product.category] || (product.category || '').replace(/-/g, ' ');
+    var catLabel = product.categoryName || CATEGORY_LABELS[product.rawCategory] || CATEGORY_LABELS[product.category] || (product.category || '').replace(/-/g, ' ');
     var metaInfo = [];
     if (product.material) metaInfo.push(product.material);
     if (product.capacity) metaInfo.push(product.capacity);
@@ -439,17 +461,131 @@
 
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Build brand card HTML Ã¢â€â‚¬Ã¢â€â‚¬ */
-  function buildBrandCard(brand) {
-    var logoHtml = brand.logo
-      ? '<img src="' + escHtml(brand.logo) + '" alt="' + escHtml(brand.name) + '" class="brand-card-logo" />'
-      : '<div class="brand-card-logo-placeholder">' + escHtml(brand.name.charAt(0)) + '</div>';
+  var BRAND_PROFILES = {
+    taroba: {
+      specialty: 'In-House Flagship Brand',
+      category: 'Crockery, Glassware, Flasks & Cutlery',
+      description: 'Our officially registered in-house trademark (filed 2016), crafted for durability and everyday elegance across homes and hospitality.',
+      monogram: 'T',
+      accent: 'gold'
+    },
+    ariane: {
+      specialty: 'Fine Porcelain & HoReCa Chinaware',
+      category: 'Luxury Hotelware & Dinnerware',
+      description: 'World-class vitrified fine porcelain engineered for 5-star hotels, banquets, fine dining restaurants, and discerning homes.',
+      monogram: 'AR',
+      accent: 'navy'
+    },
+    dinewell: {
+      specialty: '100% Food-Grade Melamine',
+      category: 'Commercial & Institutional Melamineware',
+      description: 'Heavy-duty, stain-resistant melamine plates, bowls, platters, and buffet serveware trusted by caterers and restaurants.',
+      monogram: 'DW',
+      accent: 'navy'
+    },
+    ocean: {
+      specialty: 'International Stemware & Tumblers',
+      category: 'Barware, Drinkware & Glassware',
+      description: 'Crystal-clear tumblers, goblets, juice glasses, and beverage glassware renowned for brilliance and rim strength.',
+      monogram: 'OC',
+      accent: 'navy'
+    },
+    luminarc: {
+      specialty: 'French Tempered Glass & Opalware',
+      category: 'Dinner Sets, Bowls & Drinkware',
+      description: 'Iconic French tableware combining chip-resistant tempered opal glass with timeless contemporary dining silhouettes.',
+      monogram: 'LU',
+      accent: 'navy'
+    },
+    larah: {
+      specialty: 'Toughened Opal Glass by Borosil',
+      category: 'Microwave-Safe Dinner Sets',
+      description: 'Lightweight, bone-ash-free toughened opalware dinner sets and serving bowls designed for modern Indian households.',
+      monogram: 'LA',
+      accent: 'navy'
+    },
+    'roxx-pro': {
+      specialty: 'Contemporary Glass & Steelware',
+      category: 'Storage, Drinkware & Dinnerware',
+      description: 'Versatile kitchen storage jars, insulated casseroles, glass tumblers, and gift-ready tableware collections.',
+      monogram: 'RX',
+      accent: 'navy'
+    },
+    roxx: {
+      specialty: 'Contemporary Glass & Steelware',
+      category: 'Storage, Drinkware & Dinnerware',
+      description: 'Versatile kitchen storage jars, insulated casseroles, glass tumblers, and gift-ready tableware collections.',
+      monogram: 'RX',
+      accent: 'navy'
+    },
+    lg: {
+      specialty: 'Commercial Tableware & Serveware',
+      category: 'Crockery & Hospitality Essentials',
+      description: 'Dependable everyday crockery, serving pieces, and utility tableware stocked for retail and bulk trade buyers.',
+      monogram: 'LG',
+      accent: 'navy'
+    },
+    koko: {
+      specialty: 'Modern Kitchen & Tableware',
+      category: 'Serveware, Bowls & Accessories',
+      description: 'Stylish, value-driven tableware, serving bowls, and utility essentials popular with retailers and gifting buyers.',
+      monogram: 'KK',
+      accent: 'navy'
+    },
+    krista: {
+      specialty: 'Premium Acrylic & Serveware',
+      category: 'Unbreakable Drinkware & Trays',
+      description: 'High-clarity food-grade acrylic tumblers, pitchers, and servingware ideal for outdoor dining, clubs, and banquets.',
+      monogram: 'KR',
+      accent: 'navy'
+    }
+  };
 
-    return '<div class="brand-card' + (brand.own_brand ? ' brand-card--own' : '') + '">' +
-      logoHtml +
-      (brand.own_brand ? '<span class="brand-own-badge">Own Brand</span>' : '') +
-      '<span class="brand-card-name">' + escHtml(brand.name) + '</span>' +
-      (brand.tagline ? '<span class="brand-card-tagline">' + escHtml(brand.tagline) + '</span>' : '') +
-    '</div>';
+  function buildBrandCard(brand) {
+    var slugKey = String(brand.id || brand.name || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    var profile = BRAND_PROFILES[slugKey] || {};
+    var isOwn = slugKey === 'taroba' || (!!brand.own_brand && slugKey !== 'lg');
+    var specialty = profile.specialty || (isOwn ? 'In-House Flagship Brand' : 'Authorized Stockist');
+    var categoryTag = profile.category || 'Tableware & Crockery Collection';
+    var desc = (brand.description && brand.description.trim().length > 25 && brand.description !== 'Our Own Brand')
+      ? brand.description
+      : (profile.description || ('Genuine ' + brand.name + ' tableware, crockery, and hospitality products stocked in ready wholesale & retail quantities at our Park Town showroom.'));
+    var monogram = profile.monogram || String(brand.name || 'B').slice(0, 2).toUpperCase();
+    var href = isOwn ? '/taroba' : ('/products?brand=' + encodeURIComponent(slugKey));
+    var countLabel = brand.productCount && brand.productCount > 0
+      ? (brand.productCount + '+ Products')
+      : 'In Stock at Showroom';
+
+    var logoHtml = brand.logo
+      ? '<div class="brand-card-emblem brand-card-emblem--img"><img src="' + escHtml(brand.logo) + '" alt="' + escHtml(brand.name) + '" class="brand-card-logo" loading="lazy" /></div>'
+      : '<div class="brand-card-emblem' + (isOwn ? ' brand-card-emblem--own' : '') + '" aria-hidden="true">' +
+          '<span class="brand-card-monogram">' + escHtml(monogram) + '</span>' +
+        '</div>';
+
+    var topBadge = isOwn
+      ? '<span class="brand-own-badge">&#9670; Our Own Brand</span>'
+      : '<span class="brand-stock-badge">Authorized Stockist</span>';
+
+    return '<article class="brand-card' + (isOwn ? ' brand-card--own' : '') + '">' +
+      '<div class="brand-card-top">' +
+        logoHtml +
+        '<div class="brand-card-badges">' + topBadge + '</div>' +
+      '</div>' +
+      '<div class="brand-card-body">' +
+        '<span class="brand-card-category">' + escHtml(categoryTag) + '</span>' +
+        '<h3 class="brand-card-name"><a href="' + href + '" class="brand-card-title-link">' + escHtml(brand.name) + '</a></h3>' +
+        '<p class="brand-card-specialty">' + escHtml(specialty) + '</p>' +
+        '<p class="brand-card-desc">' + escHtml(desc) + '</p>' +
+      '</div>' +
+      '<div class="brand-card-footer">' +
+        '<span class="brand-card-count">' + escHtml(countLabel) + '</span>' +
+        '<a href="' + href + '" class="brand-card-cta">' + (isOwn ? 'Explore Taroba' : 'View Products') + ' <span aria-hidden="true">&rarr;</span></a>' +
+      '</div>' +
+    '</article>';
   }
 
   /* Ã¢â€â‚¬Ã¢â€â‚¬ Homepage: Featured products Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -459,32 +595,52 @@
     var brandsGrid = document.getElementById('homepage-brands-grid');
     if (!featuredGrid && !arrivalsScroll && !brandsGrid) return;
 
-    fetchJSON(DATA_BASE + 'products.json', function (err, data) {
-      if (err || !data) return;
-      allProducts = (data.products || []).filter(function (p) { return p.active !== false; });
-
-      if (featuredGrid) {
-        var featured = allProducts.filter(function (p) { return (p.tags || []).includes('featured'); }).slice(0, 4);
-        if (featured.length === 0) {
-          featuredGrid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px;">Browse our full range on the <a href="/products">Products page</a>.</p>';
-        } else {
-          featuredGrid.innerHTML = featured.map(buildProductCard).join('');
+    if (featuredGrid) {
+      apiFetch('/products?active=true&featured=true&pageSize=8&sortBy=createdAt&sortOrder=desc', function (err, d) {
+        var list = (!err && d && Array.isArray(d.data)) ? d.data.map(mapApiProduct) : [];
+        if (list.length > 0) {
+          featuredGrid.innerHTML = list.slice(0, 4).map(buildProductCard).join('');
+          return;
         }
-      }
+        apiFetch('/products?active=true&pageSize=8&sortBy=createdAt&sortOrder=desc', function (err2, d2) {
+          var fallback = (!err2 && d2 && Array.isArray(d2.data)) ? d2.data.map(mapApiProduct) : [];
+          if (fallback.length === 0) {
+            featuredGrid.innerHTML = '<p class="products-loading-text" style="grid-column:1/-1;text-align:center;padding:40px;">Browse our full range on the <a href="/products">Products page</a>.</p>';
+          } else {
+            featuredGrid.innerHTML = fallback.slice(0, 4).map(buildProductCard).join('');
+          }
+        });
+      });
+    }
 
-      if (arrivalsScroll) {
-        var newArrivals = allProducts.filter(function (p) { return (p.tags || []).includes('new_arrival'); }).slice(0, 8);
-        if (newArrivals.length === 0) {
-          arrivalsScroll.innerHTML = '<p class="products-loading-text" style="padding:40px;">New arrivals coming soon.</p>';
-        } else {
-          arrivalsScroll.innerHTML = newArrivals.map(buildProductCard).join('');
+    if (arrivalsScroll) {
+      apiFetch('/products?active=true&newArrival=true&pageSize=12&sortBy=createdAt&sortOrder=desc', function (err, d) {
+        var list = (!err && d && Array.isArray(d.data)) ? d.data.map(mapApiProduct) : [];
+        if (list.length > 0) {
+          arrivalsScroll.innerHTML = list.slice(0, 8).map(buildProductCard).join('');
+          return;
         }
-      }
-    });
+        apiFetch('/products?active=true&pageSize=12&sortBy=createdAt&sortOrder=desc', function (err2, d2) {
+          var fallback = (!err2 && d2 && Array.isArray(d2.data)) ? d2.data.map(mapApiProduct) : [];
+          if (fallback.length === 0) {
+            arrivalsScroll.innerHTML = '<p class="products-loading-text" style="padding:40px;">New arrivals coming soon.</p>';
+          } else {
+            arrivalsScroll.innerHTML = fallback.slice(0, 8).map(buildProductCard).join('');
+          }
+        });
+      });
+    }
 
     fetchJSON(DATA_BASE + 'brands.json', function (err, data) {
       if (err || !data || !brandsGrid) return;
-      allBrands = (data.brands || []).filter(function (b) { return b.active !== false; });
+      allBrands = (data.brands || [])
+        .filter(function (b) { return b.active !== false; })
+        .sort(function (a, b) {
+          var aOwn = a.own_brand || String(a.name || '').toLowerCase() === 'taroba' ? 1 : 0;
+          var bOwn = b.own_brand || String(b.name || '').toLowerCase() === 'taroba' ? 1 : 0;
+          if (aOwn !== bOwn) return bOwn - aOwn;
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
       if (allBrands.length === 0) {
         brandsGrid.innerHTML = '<p class="brands-note">Our brand list is being updated.</p>';
       } else {
@@ -499,7 +655,14 @@
     if (!grid) return;
     fetchJSON(DATA_BASE + 'brands.json', function (err, data) {
       if (err || !data) return;
-      var brands = (data.brands || []).filter(function (b) { return b.active !== false; });
+      var brands = (data.brands || [])
+        .filter(function (b) { return b.active !== false; })
+        .sort(function (a, b) {
+          var aOwn = a.own_brand || String(a.name || '').toLowerCase() === 'taroba' ? 1 : 0;
+          var bOwn = b.own_brand || String(b.name || '').toLowerCase() === 'taroba' ? 1 : 0;
+          if (aOwn !== bOwn) return bOwn - aOwn;
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
       if (brands.length === 0) {
         grid.innerHTML = '<div class="brand-placeholder-note"><p>Our brand list is being updated. Please contact us for the brands we stock.</p></div>';
       } else {
@@ -592,26 +755,114 @@
       sel.innerHTML = html;
     }
 
-    function loadRemainingPages(startPage, totalPages) {
+    function getCategoryIconSvg(slug) {
+      var s = normalizeCategorySlug(slug);
+      if (s === 'crockery') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg>';
+      if (s === 'cutlery') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-3 4.5-3 7h3v11"/></svg>';
+      if (s === 'glassware') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l-1 7a3 3 0 0 1-6 0zM12 13v8M8 21h8"/></svg>';
+      if (s === 'melamineware') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>';
+      if (s === 'acrylicware') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12l-1.5 18h-9z"/></svg>';
+      if (s === 'kitchenware') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM3 9h2M19 9h2M9 6a3 3 0 0 1 6 0"/></svg>';
+      if (s === 'hotelware') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18M5 18a7 7 0 0 1 14 0M12 7v4"/></svg>';
+      if (s === 'wooden-handicrafts') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16a6 6 0 0 1-6 6h-4a6 6 0 0 1-6-6z"/></svg>';
+      if (s === 'new-arrivals') return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>';
+      return '<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
+    }
+
+    function renderDynamicCategories(categories) {
+      var chipsWrap = document.getElementById('category-chips');
+      if (!chipsWrap || !Array.isArray(categories) || categories.length === 0) return;
+
+      var activeCats = categories
+        .filter(function (c) { return c && c.isActive !== false; })
+        .slice()
+        .sort(function (a, b) {
+          var sa = typeof a.sortOrder === 'number' ? a.sortOrder : 99;
+          var sb = typeof b.sortOrder === 'number' ? b.sortOrder : 99;
+          if (sa !== sb) return sa - sb;
+          return String(a.name || '').localeCompare(String(b.name || ''));
+        });
+
+      if (activeCats.length === 0) return;
+
+      // Sync CATEGORY_SORT_MAP and CATEGORY_LABELS with Admin Categories
+      activeCats.forEach(function (c, idx) {
+        var rawSlug = String(c.slug || '').toLowerCase().trim();
+        var normSlug = normalizeCategorySlug(rawSlug);
+        var orderVal = typeof c.sortOrder === 'number' ? c.sortOrder : (idx + 1);
+        CATEGORY_SORT_MAP[rawSlug] = orderVal;
+        CATEGORY_SORT_MAP[normSlug] = orderVal;
+        if (c.name) {
+          CATEGORY_LABELS[rawSlug] = c.name;
+          CATEGORY_LABELS[normSlug] = c.name;
+        }
+      });
+
+      // Re-sync loaded products with updated category sortOrder & names
+      if (allProducts.length > 0) {
+        allProducts.forEach(function (p) {
+          var orderVal = CATEGORY_SORT_MAP[p.rawCategory] !== undefined
+            ? CATEGORY_SORT_MAP[p.rawCategory]
+            : CATEGORY_SORT_MAP[p.category];
+          if (orderVal !== undefined) p.categorySortOrder = orderVal;
+          var labelVal = CATEGORY_LABELS[p.rawCategory] || CATEGORY_LABELS[p.category];
+          if (labelVal) p.categoryName = labelVal;
+        });
+      }
+
+      var hasNewArrivals = false;
+      var html = '<button class="category-chip' + (activeCategory === 'all' ? ' active' : '') + '" data-category="all" role="tab" aria-selected="' + (activeCategory === 'all' ? 'true' : 'false') + '" id="chip-all">All Products</button>';
+
+      activeCats.forEach(function (c) {
+        var rawSlug = String(c.slug || '').toLowerCase().trim();
+        var normSlug = normalizeCategorySlug(rawSlug);
+        if (normSlug === 'new-arrivals') hasNewArrivals = true;
+        var isSelected = activeCategory === normSlug || activeCategory === rawSlug;
+        var extraClass = normSlug === 'new-arrivals' ? ' category-chip--new' : '';
+        html += '<button class="category-chip' + extraClass + (isSelected ? ' active' : '') + '" data-category="' + escHtml(normSlug) + '" data-raw-slug="' + escHtml(rawSlug) + '" role="tab" aria-selected="' + (isSelected ? 'true' : 'false') + '">' +
+          getCategoryIconSvg(normSlug) +
+          escHtml(c.name) +
+        '</button>';
+      });
+
+      if (!hasNewArrivals) {
+        var isNewSel = activeCategory === 'new-arrivals';
+        html += '<button class="category-chip category-chip--new' + (isNewSel ? ' active' : '') + '" data-category="new-arrivals" role="tab" aria-selected="' + (isNewSel ? 'true' : 'false') + '" id="chip-new">' +
+          getCategoryIconSvg('new-arrivals') +
+          'New Arrivals</button>';
+      }
+
+      chipsWrap.innerHTML = html;
+      applyFiltersAndRender();
+    }
+
+    function loadRemainingPages(startPage, totalPages, pageSize) {
       if (startPage > totalPages) return;
-      apiFetch('/products?active=true&pageSize=100&sortBy=name&sortOrder=asc&page=' + startPage, function(err, data) {
+      var ps = pageSize || 500;
+      apiFetch('/products?active=true&pageSize=' + ps + '&sortBy=name&sortOrder=asc&page=' + startPage, function(err, data) {
         if (!err && data && Array.isArray(data.data)) {
           allProducts = allProducts.concat(data.data.map(mapApiProduct));
           applyFiltersAndRender();
-          loadRemainingPages(startPage + 1, totalPages);
+          loadRemainingPages(startPage + 1, totalPages, ps);
         }
       });
     }
 
     function loadInitialProducts() {
       renderLoadingSkeletons();
-      apiFetch('/products?active=true&pageSize=100&sortBy=name&sortOrder=asc', function(apiErr, apiData) {
+      apiFetch('/categories', function (catErr, catData) {
+        if (!catErr && catData && Array.isArray(catData.data)) {
+          renderDynamicCategories(catData.data);
+        }
+      });
+      apiFetch('/products?active=true&pageSize=500&sortBy=name&sortOrder=asc&page=1', function(apiErr, apiData) {
         if (!apiErr && apiData && Array.isArray(apiData.data)) {
           allProducts = apiData.data.map(mapApiProduct);
           applyFiltersAndRender();
           var totalPages = (apiData.pagination && apiData.pagination.totalPages) || 1;
+          var actualPageSize = (apiData.pagination && apiData.pagination.pageSize) || 500;
           if (totalPages > 1) {
-            loadRemainingPages(2, totalPages);
+            loadRemainingPages(2, totalPages, actualPageSize);
           }
           apiFetch('/brands', function(bErr, bData) {
             if (!bErr && bData && Array.isArray(bData.data)) {
@@ -626,26 +877,30 @@
 
     loadInitialProducts();
 
-    // Chip click
-    document.querySelectorAll('.category-chip').forEach(function (chip) {
-      chip.addEventListener('click', function () {
-        document.querySelectorAll('.category-chip').forEach(function (c) {
+    // Delegated chip click (supports both static and dynamically fetched Admin categories)
+    var chipsContainer = document.getElementById('category-chips');
+    if (chipsContainer) {
+      chipsContainer.addEventListener('click', function (e) {
+        var chip = e.target.closest('.category-chip');
+        if (!chip) return;
+        chipsContainer.querySelectorAll('.category-chip').forEach(function (c) {
           c.classList.remove('active');
           c.setAttribute('aria-selected', 'false');
         });
-        this.classList.add('active');
-        this.setAttribute('aria-selected', 'true');
-        activeCategory = this.dataset.category || 'all';
+        chip.classList.add('active');
+        chip.setAttribute('aria-selected', 'true');
+        activeCategory = chip.dataset.category || 'all';
         activeBrand = null;
         currentPage = 1;
         applyFiltersAndRender();
         // Update URL without reload
         var url = new URL(window.location.href);
+        url.searchParams.delete('brand');
         if (activeCategory === 'all') url.searchParams.delete('category');
         else url.searchParams.set('category', activeCategory);
         window.history.replaceState({}, '', url.toString());
       });
-    });
+    }
 
     // Search
     var searchEl = document.getElementById('products-search');
@@ -686,26 +941,64 @@
     // Filter
     filteredProducts = allProducts.filter(function (p) {
       var cat = normalizeCategorySlug(p.category || '');
+      var rawCat = (p.rawCategory || '').toLowerCase();
       var matchCat = activeCategory === 'all' ||
         (activeCategory === 'new-arrivals'
           ? (p.tags || []).includes('new_arrival')
-          : cat === activeCategory || cat.startsWith(activeCategory + '-') || cat.startsWith(activeCategory.replace('-', '')));
-      var matchBrand = !activeBrand || (p.brand || '').toLowerCase() === activeBrand.toLowerCase();
+          : cat === activeCategory || rawCat === activeCategory || cat.startsWith(activeCategory + '-') || cat.startsWith(activeCategory.replace('-', '')));
+      var brandRaw = (p.brand || '').toLowerCase().trim();
+      var brandSlug = brandRaw.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      var activeBrandNorm = (activeBrand || '').toLowerCase().trim();
+      var activeBrandSlug = activeBrandNorm.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      var matchBrand = !activeBrand || brandRaw === activeBrandNorm || brandSlug === activeBrandSlug;
       var matchSearch = !searchTerm ||
         (p.name || '').toLowerCase().includes(searchTerm) ||
         (p.brand || '').toLowerCase().includes(searchTerm) ||
         (p.id || '').toLowerCase().includes(searchTerm) ||
         (p.category || '').toLowerCase().includes(searchTerm) ||
+        (p.categoryName || '').toLowerCase().includes(searchTerm) ||
         (p.collection || '').toLowerCase().includes(searchTerm) ||
         (p.material || '').toLowerCase().includes(searchTerm);
       return matchCat && matchBrand && matchSearch;
     });
 
-    // Sort
-    if (sortOrder === 'name-asc' || sortOrder === 'name-az') filteredProducts.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    else if (sortOrder === 'name-desc' || sortOrder === 'name-za') filteredProducts.sort(function (a, b) { return (b.name || '').localeCompare(a.name || ''); });
-    else if (sortOrder === 'new') filteredProducts.sort(function (a, b) { return ((b.tags || []).includes('new_arrival') ? 1 : 0) - ((a.tags || []).includes('new_arrival') ? 1 : 0); });
-    else if (sortOrder === 'brand') filteredProducts.sort(function (a, b) { return (a.brand || '').localeCompare(b.brand || ''); });
+    // Sort (respects Admin category sortOrder on default and category sort)
+    if (sortOrder === 'name-asc' || sortOrder === 'name-az') {
+      filteredProducts.sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    } else if (sortOrder === 'name-desc' || sortOrder === 'name-za') {
+      filteredProducts.sort(function (a, b) { return (b.name || '').localeCompare(a.name || ''); });
+    } else if (sortOrder === 'category') {
+      filteredProducts.sort(function (a, b) {
+        var ca = typeof a.categorySortOrder === 'number' ? a.categorySortOrder : 99;
+        var cb = typeof b.categorySortOrder === 'number' ? b.categorySortOrder : 99;
+        if (ca !== cb) return ca - cb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    } else if (sortOrder === 'new') {
+      filteredProducts.sort(function (a, b) {
+        var na = (a.tags || []).includes('new_arrival') ? 1 : 0;
+        var nb = (b.tags || []).includes('new_arrival') ? 1 : 0;
+        if (nb !== na) return nb - na;
+        return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      });
+    } else if (sortOrder === 'brand') {
+      filteredProducts.sort(function (a, b) {
+        var cmp = (a.brand || '').localeCompare(b.brand || '');
+        if (cmp !== 0) return cmp;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    } else {
+      // Default: Featured first, then Admin Category sortOrder, then Name A-Z
+      filteredProducts.sort(function (a, b) {
+        var fa = (a.tags || []).includes('featured') ? 1 : 0;
+        var fb = (b.tags || []).includes('featured') ? 1 : 0;
+        if (fb !== fa) return fb - fa;
+        var ca = typeof a.categorySortOrder === 'number' ? a.categorySortOrder : 99;
+        var cb = typeof b.categorySortOrder === 'number' ? b.categorySortOrder : 99;
+        if (ca !== cb) return ca - cb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }
 
     var total = filteredProducts.length;
     var pageProducts = filteredProducts.slice(0, currentPage * PAGE_SIZE);

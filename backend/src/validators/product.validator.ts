@@ -56,7 +56,7 @@ export const productQuerySchema = z.object({
   newArrival: z.enum(["true", "false"]).optional(),
   active: z.enum(["true", "false", "all"]).optional().default("true"),
   sortBy: z
-    .enum(["name", "createdAt", "mrp", "catalogueMrp", "productCode", "collection"])
+    .enum(["name", "createdAt", "mrp", "catalogueMrp", "productCode", "collection", "category"])
     .optional()
     .default("createdAt"),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),

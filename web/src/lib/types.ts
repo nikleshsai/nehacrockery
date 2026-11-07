@@ -79,8 +79,8 @@ export interface Product {
   description?: string | null;
   brandId?: string | null;
   categoryId?: string | null;
-  brand?: { id?: string; name: string; slug?: string } | null;
-  category?: { id?: string; name: string; slug: string } | null;
+  brand?: { id?: string; name: string; slug?: string; sortOrder?: number } | null;
+  category?: { id?: string; name: string; slug: string; sortOrder?: number } | null;
   material?: string | null;
   capacity?: string | null;
   dimensions?: string | null;

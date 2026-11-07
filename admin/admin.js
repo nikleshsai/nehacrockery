@@ -715,6 +715,8 @@
     if (state.filters.productBrand !== 'all') q += '&brand=' + encodeURIComponent(state.filters.productBrand);
     if (state.filters.productStatus === 'featured') q += '&featured=true';
     else if (state.filters.productStatus === 'new') q += '&newArrival=true';
+    else if (state.filters.productStatus === 'active') q += '&active=true';
+    else if (state.filters.productStatus === 'inactive') q += '&active=false';
 
     api('GET', '/admin/products?' + q, null, function (err, res) {
       if (err) {
@@ -901,14 +903,25 @@
   function loadCategories() {
     var tbody = $('categories-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="td-loading">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="td-loading">Loading…</td></tr>';
     api('GET', '/admin/categories', null, function (err, data) {
-      if (err) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty text-danger">' + esc(err.message) + '</td></tr>'; return; }
-      var cats = data.data || [];
-      if (!cats.length) { tbody.innerHTML = '<tr><td colspan="6" class="td-empty">No categories yet</td></tr>'; return; }
-      tbody.innerHTML = cats.map(function (c) {
+      if (err) { tbody.innerHTML = '<tr><td colspan="7" class="td-empty text-danger">' + esc(err.message) + '</td></tr>'; return; }
+      var cats = (data.data || []).slice().sort(function (a, b) {
+        var sa = typeof a.sortOrder === 'number' ? a.sortOrder : 99;
+        var sb = typeof b.sortOrder === 'number' ? b.sortOrder : 99;
+        if (sa !== sb) return sa - sb;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+      state._adminCategories = cats;
+      if (!cats.length) { tbody.innerHTML = '<tr><td colspan="7" class="td-empty">No categories yet</td></tr>'; return; }
+      tbody.innerHTML = cats.map(function (c, idx) {
         var parent = cats.find(function (x) { return x.id === c.parentId; });
         return '<tr>' +
+          '<td><div style="display:flex;align-items:center;gap:6px;">' +
+            '<span class="badge badge-new font-mono">' + (typeof c.sortOrder === 'number' ? c.sortOrder : (idx + 1)) + '</span>' +
+            '<button class="btn btn-xs btn-ghost" title="Move Up" ' + (idx === 0 ? 'disabled' : '') + ' onclick="moveCategoryOrder(\'' + c.id + '\',-1)">↑</button>' +
+            '<button class="btn btn-xs btn-ghost" title="Move Down" ' + (idx === cats.length - 1 ? 'disabled' : '') + ' onclick="moveCategoryOrder(\'' + c.id + '\',1)">↓</button>' +
+          '</div></td>' +
           '<td><strong>' + esc(c.name) + '</strong></td>' +
           '<td class="text-muted font-mono text-sm">' + esc(c.slug) + '</td>' +
           '<td>' + (parent ? esc(parent.name) : '—') + '</td>' +
@@ -921,6 +934,25 @@
       }).join('');
     });
   }
+
+  window.moveCategoryOrder = function (id, delta) {
+    var cats = (state._adminCategories || []).slice();
+    var idx = cats.findIndex(function (c) { return c.id === id; });
+    var swapIdx = idx + delta;
+    if (idx < 0 || swapIdx < 0 || swapIdx >= cats.length) return;
+    var current = cats[idx];
+    var target = cats[swapIdx];
+    var newCurrentOrder = swapIdx + 1;
+    var newTargetOrder = idx + 1;
+    api('PUT', '/admin/categories/' + current.id, { name: current.name, sortOrder: newCurrentOrder, isActive: current.isActive }, function (err1) {
+      if (err1) { toast('Failed to reorder: ' + err1.message, 'error'); return; }
+      api('PUT', '/admin/categories/' + target.id, { name: target.name, sortOrder: newTargetOrder, isActive: target.isActive }, function (err2) {
+        if (err2) { toast('Failed to reorder: ' + err2.message, 'error'); return; }
+        toast('Category order updated for customer page!', 'success');
+        loadMetaData(loadCategories);
+      });
+    });
+  };
 
   window.editCategory = function (id) {
     api('GET', '/admin/categories', null, function (err, data) {

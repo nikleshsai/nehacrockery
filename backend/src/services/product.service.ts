@@ -63,8 +63,8 @@ const productPublicSelect = {
   createdAt: true,
   updatedAt: true,
   // Relations
-  brand: { select: { id: true, name: true, slug: true, logo: true } },
-  category: { select: { id: true, name: true, slug: true } },
+  brand: { select: { id: true, name: true, slug: true, logo: true, sortOrder: true } },
+  category: { select: { id: true, name: true, slug: true, sortOrder: true } },
   images: { select: imageSelect, orderBy: { sortOrder: "asc" as const } },
 };
 
@@ -130,6 +130,8 @@ function buildProductOrderBy(
       return { productCode: dir };
     case "collection":
       return { collection: dir };
+    case "category":
+      return { category: { sortOrder: dir } };
     default:
       return { createdAt: dir };
   }

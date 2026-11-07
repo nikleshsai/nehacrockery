@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { getData, request } from './api';
-import type { Brand, Catalogue, Product } from './types';
+import type { Brand, Catalogue, Category, Product } from './types';
 
 export interface AsyncState<T> {
   data: T | null;
@@ -30,7 +30,7 @@ export function useApiData<T>(path: string | null): AsyncState<T> {
   return state;
 }
 
-/** Load every active product (follows pagination, 100 per page). */
+/** Load every active product (follows pagination, 500 per page). */
 export function useAllProducts(): AsyncState<Product[]> & { retry: () => void } {
   const [state, setState] = useState<AsyncState<Product[]>>({ data: null, loading: true, error: null });
   const [attempt, setAttempt] = useState(0);
@@ -40,13 +40,15 @@ export function useAllProducts(): AsyncState<Product[]> & { retry: () => void } 
     setState((s) => ({ ...s, loading: true, error: null }));
     (async () => {
       try {
-        const base = '/products?active=true&pageSize=100&sortBy=name&sortOrder=asc';
-        const first = await request<Product[]>(`${base}&page=1`);
+        const first = await request<Product[]>('/products?active=true&pageSize=500&sortBy=name&sortOrder=asc&page=1');
         let all = first.data;
         if (!cancelled) setState({ data: all, loading: true, error: null });
         const totalPages = first.pagination?.totalPages ?? 1;
+        const actualPageSize = first.pagination?.pageSize ?? 500;
         for (let p = 2; p <= totalPages; p++) {
-          const next = await request<Product[]>(`${base}&page=${p}`);
+          const next = await request<Product[]>(
+            `/products?active=true&pageSize=${actualPageSize}&sortBy=name&sortOrder=asc&page=${p}`,
+          );
           all = all.concat(next.data);
           if (!cancelled) setState({ data: all, loading: p < totalPages, error: null });
         }
@@ -68,6 +70,10 @@ export function useAllProducts(): AsyncState<Product[]> & { retry: () => void } 
 
 export function useBrands(): AsyncState<Brand[]> {
   return useApiData<Brand[]>('/brands');
+}
+
+export function useCategories(): AsyncState<Category[]> {
+  return useApiData<Category[]>('/categories');
 }
 
 /** First active catalogue that has a downloadable file. */
