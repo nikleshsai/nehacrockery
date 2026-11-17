@@ -399,7 +399,7 @@ router
   .route('/settings')
   .get(
     authorize(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.STAFF),
-    siteController.getSiteSettings,
+    siteController.adminGetSiteSettings,   // full row incl. panNumber — auth-gated
   )
   .put(
     authorize(UserRole.SUPER_ADMIN, UserRole.ADMIN),

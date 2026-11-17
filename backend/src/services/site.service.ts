@@ -123,9 +123,39 @@ export async function deleteReview(id: string) {
 
 // ── SITE SETTINGS ─────────────────────────────────────────────────────────────
 
+// Fields safe to expose on the public /site-settings endpoint (no PAN)
+const siteSettingsPublicSelect = {
+  id: true,
+  businessName: true,
+  tagline: true,
+  phone: true,
+  whatsapp: true,
+  email: true,
+  address: true,
+  mapUrl: true,
+  logoUrl: true,
+  facebook: true,
+  instagram: true,
+  twitter: true,
+  youtube: true,
+  linkedin: true,
+  gstNumber: true,   // shown on invoices — public knowledge
+  // panNumber intentionally excluded — sensitive personal/business tax ID
+  createdAt: true,
+  updatedAt: true,
+};
+
+/** Public endpoint: returns site settings WITHOUT panNumber */
 export async function getSiteSettings() {
-  const settings = await prisma.siteSettings.findFirst({ orderBy: { createdAt: 'asc' } });
-  return settings;
+  return prisma.siteSettings.findFirst({
+    orderBy: { createdAt: 'asc' },
+    select: siteSettingsPublicSelect,
+  });
+}
+
+/** Admin endpoint: returns ALL fields including panNumber (requires auth) */
+export async function getAdminSiteSettings() {
+  return prisma.siteSettings.findFirst({ orderBy: { createdAt: 'asc' } });
 }
 
 export async function upsertSiteSettings(data: Partial<{

@@ -70,8 +70,15 @@ export async function adminDeleteReview(req: Request, res: Response): Promise<vo
 
 // ── SITE SETTINGS ─────────────────────────────────────────────────────────────
 
+/** Public handler — panNumber is stripped in the service select */
 export async function getSiteSettings(_req: Request, res: Response): Promise<void> {
   const settings = await siteService.getSiteSettings();
+  sendSuccess(res, settings);
+}
+
+/** Admin handler — returns all fields including panNumber (route is auth-gated) */
+export async function adminGetSiteSettings(_req: Request, res: Response): Promise<void> {
+  const settings = await siteService.getAdminSiteSettings();
   sendSuccess(res, settings);
 }
 
