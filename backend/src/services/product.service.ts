@@ -1,4 +1,4 @@
-// =============================================================================
+﻿// =============================================================================
 // Product service - all business logic for product CRUD, search, filtering
 // Updated: includes catalogue fields (collection, colourFinish, catalogueMrp, etc.)
 // =============================================================================
@@ -13,7 +13,7 @@ import type {
   ProductQueryInput,
 } from "../validators/product.validator";
 
-// ── Shared image select ───────────────────────────────────────────────────────
+// â”€â”€ Shared image select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const imageSelect = {
   id: true,
   imageUrl: true,
@@ -21,7 +21,7 @@ const imageSelect = {
   sortOrder: true,
 };
 
-// ── Shared product select (public) ────────────────────────────────────────────
+// â”€â”€ Shared product select (public) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const productPublicSelect = {
   id: true,
   name: true,
@@ -68,7 +68,7 @@ const productPublicSelect = {
   images: { select: imageSelect, orderBy: { sortOrder: "asc" as const } },
 };
 
-// ── Build WHERE clause from public query params ───────────────────────────────
+// â”€â”€ Build WHERE clause from public query params â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildProductWhere(
   query: ProductQueryInput
 ): Prisma.ProductWhereInput {
@@ -113,7 +113,7 @@ function buildProductWhere(
   return where;
 }
 
-// ── Build ORDER BY ────────────────────────────────────────────────────────────
+// â”€â”€ Build ORDER BY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildProductOrderBy(
   sortBy: string,
   sortOrder: string
@@ -137,7 +137,7 @@ function buildProductOrderBy(
   }
 }
 
-// ── PUBLIC: List products ─────────────────────────────────────────────────────
+// â”€â”€ PUBLIC: List products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function listProducts(query: ProductQueryInput, maxPageSize = 200) {
   const { page, pageSize, skip, take } = parsePagination(
     query.page,
@@ -164,7 +164,7 @@ export async function listProducts(query: ProductQueryInput, maxPageSize = 200) 
   return { products, pagination: buildPaginationMeta(total, page, pageSize) };
 }
 
-// ── PUBLIC: Get product by slug ───────────────────────────────────────────────
+// â”€â”€ PUBLIC: Get product by slug â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function getProductBySlug(slug: string) {
   const product = await prisma.product.findFirst({
     where: { slug, isActive: true },
@@ -174,7 +174,7 @@ export async function getProductBySlug(slug: string) {
   return product;
 }
 
-// ── ADMIN: Get product by ID (includes isActive=false) ───────────────────────
+// â”€â”€ ADMIN: Get product by ID (includes isActive=false) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function getProductById(id: string) {
   const product = await prisma.product.findUnique({
     where: { id },
@@ -184,7 +184,7 @@ export async function getProductById(id: string) {
   return product;
 }
 
-// ── ADMIN: Create product (B6: retry on P2002 slug race) ─────────────────────
+// â”€â”€ ADMIN: Create product (B6: retry on P2002 slug race) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function createProduct(data: CreateProductInput) {
   const cleanImageUrl = data.imageUrl?.trim() || null;
   const reservedSlugs = new Set<string>();
@@ -252,7 +252,7 @@ export async function createProduct(data: CreateProductInput) {
   throw AppError.internal("Could not generate a unique slug for product");
 }
 
-// ── ADMIN: Update product ─────────────────────────────────────────────────────
+// â”€â”€ ADMIN: Update product â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function updateProduct(id: string, data: UpdateProductInput) {
   const existing = await prisma.product.findUnique({
     where: { id },
@@ -335,7 +335,7 @@ export async function updateProduct(id: string, data: UpdateProductInput) {
   return product;
 }
 
-// ── ADMIN: Delete product ─────────────────────────────────────────────────────
+// â”€â”€ ADMIN: Delete product â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function deleteProduct(id: string) {
   const existing = await prisma.product.findUnique({
     where: { id },
@@ -345,7 +345,7 @@ export async function deleteProduct(id: string) {
   await prisma.product.delete({ where: { id } });
 }
 
-// ── ADMIN: Add product image ──────────────────────────────────────────────────
+// â”€â”€ ADMIN: Add product image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function addProductImage(
   productId: string,
   imageUrl: string,
@@ -389,18 +389,18 @@ export async function addProductImage(
   });
 }
 
-// ── ADMIN: Get a single product image (for storage deletion) ──────────────────
-export async function getProductImageById(imageId: string) {
-  return prisma.productImage.findUnique({
-    where: { id: imageId },
+// â”€â”€ ADMIN: Get a single product image (for storage deletion) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export async function getProductImageById(imageId: string, productId: string) {
+  return prisma.productImage.findFirst({
+    where: { id: imageId, productId },
     select: { id: true, imageUrl: true },
   });
 }
 
-// ── ADMIN: Delete product image ───────────────────────────────────────────────
-export async function deleteProductImage(imageId: string) {
-  const image = await prisma.productImage.findUnique({
-    where: { id: imageId },
+// â”€â”€ ADMIN: Delete product image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export async function deleteProductImage(imageId: string, productId: string) {
+  const image = await prisma.productImage.findFirst({
+    where: { id: imageId, productId },
     select: { id: true },
   });
   if (!image) throw AppError.notFound("Image");

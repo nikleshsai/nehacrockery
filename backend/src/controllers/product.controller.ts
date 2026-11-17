@@ -1,6 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Product controller — public + admin endpoints
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Product controller â€” public + admin endpoints
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { Request, Response } from 'express';
 import { AuditAction } from '@prisma/client';
 import * as productService from '../services/product.service';
@@ -10,7 +10,7 @@ import { auditFromRequest } from '../services/audit.service';
 import { sendSuccess, sendPaginated, sendCreated, sendNoContent } from '../utils/apiResponse';
 import { AppError } from '../utils/AppError';
 
-// ── PUBLIC ────────────────────────────────────────────────────────────────────
+// â”€â”€ PUBLIC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Fields that must never be exposed on the public API
 function stripPrivate<T extends { wholesalePrice?: unknown }>(p: T): Omit<T, 'wholesalePrice'> {
@@ -31,7 +31,7 @@ export async function getProduct(req: Request, res: Response): Promise<void> {
   sendSuccess(res, stripPrivate(product));
 }
 
-// ── ADMIN ─────────────────────────────────────────────────────────────────────
+// â”€â”€ ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function adminListProducts(req: Request, res: Response): Promise<void> {
   // Admin sees all products by default, or filtered by active=true/false when requested
@@ -64,7 +64,7 @@ export async function adminDeleteProduct(req: Request, res: Response): Promise<v
   sendNoContent(res);
 }
 
-// ── IMAGES ────────────────────────────────────────────────────────────────────
+// â”€â”€ IMAGES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function adminUploadProductImages(req: Request, res: Response): Promise<void> {
   const files = req.files as Express.Multer.File[] | undefined;
@@ -76,7 +76,7 @@ export async function adminUploadProductImages(req: Request, res: Response): Pro
 
   const images = await Promise.all(
     files.map(async (file, index) => {
-      // Upload buffer to Supabase Storage → get permanent public URL
+      // Upload buffer to Supabase Storage â†’ get permanent public URL
       const { publicUrl } = await storageService.uploadFile('product-images', file, 'products');
       const altText = req.body[`altText_${index}`] as string | undefined;
       return productService.addProductImage(productId, publicUrl, altText, index);
@@ -94,9 +94,11 @@ export async function adminUploadProductImages(req: Request, res: Response): Pro
 }
 
 export async function adminDeleteProductImage(req: Request, res: Response): Promise<void> {
+  const { productId, imageId } = req.params;
   // Fetch the image record first so we can delete the file from storage after DB delete succeeds
-  const image = await productService.getProductImageById(req.params.imageId);
-  await productService.deleteProductImage(req.params.imageId);
+  // Both calls enforce productId ownership — returns 404 if imageId does not belong to productId
+  const image = await productService.getProductImageById(imageId, productId);
+  await productService.deleteProductImage(imageId, productId);
 
   if (image?.imageUrl) {
     const storagePath = storageService.storagePathFromUrl(image.imageUrl, 'product-images');
@@ -107,13 +109,13 @@ export async function adminDeleteProductImage(req: Request, res: Response): Prom
     req,
     AuditAction.DELETE,
     'ProductImage',
-    req.params.imageId,
-    `Deleted image ${req.params.imageId} from product ${req.params.productId}`,
+    imageId,
+    `Deleted image ${imageId} from product ${productId}`,
   );
   sendNoContent(res);
 }
 
-// ── CSV/EXCEL IMPORT ──────────────────────────────────────────────────────────
+// â”€â”€ CSV/EXCEL IMPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function adminImportProducts(req: Request, res: Response): Promise<void> {
   const file = req.file as Express.Multer.File | undefined;
