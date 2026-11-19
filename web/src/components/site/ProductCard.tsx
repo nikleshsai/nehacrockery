@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Product } from '@/lib/types';
+import { useAddToCart } from '@/lib/cart';
 
 export const CATEGORY_LABELS: Record<string, string> = {
   crockery: 'Crockery & Dinnerware',
@@ -19,12 +20,13 @@ interface Props {
   cta?: string;
 }
 
-export function ProductCard({ product, cta = 'Order / Enquire' }: Props) {
+export function ProductCard({ product, cta }: Props) {
   const href = `/product/${encodeURIComponent(product.slug)}`;
   const image = product.images?.[0]?.imageUrl;
   const catSlug = product.category?.slug ?? '';
   const catLabel = product.category?.name ?? CATEGORY_LABELS[catSlug] ?? catSlug.replace(/-/g, ' ');
   const meta = [product.material, product.capacity, product.setContents].filter(Boolean).join(' · ');
+  const { add, inCart } = useAddToCart(product);
 
   return (
     <article className="product-card" data-id={product.productCode ?? product.id}>
@@ -65,9 +67,20 @@ export function ProductCard({ product, cta = 'Order / Enquire' }: Props) {
         {meta && <span className="product-card-meta">{meta}</span>}
       </div>
       <div className="product-card-footer">
-        <Link to={href} className="product-enquire-btn">
-          {cta}
-        </Link>
+        {typeof product.mrp === 'number' && (
+          <span className="product-card-price">₹{product.mrp.toLocaleString('en-IN')}</span>
+        )}
+        {typeof product.mrp !== 'number' && (
+          <span className="product-card-price-req">Price on request</span>
+        )}
+        <button
+          type="button"
+          className={`nch-atc-btn${inCart ? ' in-cart' : ''}`}
+          onClick={add}
+          aria-label={inCart ? `${product.name} added to cart` : `Add ${product.name} to cart`}
+        >
+          {inCart ? '✓ In Cart' : (cta ?? 'Add to Cart')}
+        </button>
       </div>
     </article>
   );

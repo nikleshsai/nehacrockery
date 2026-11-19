@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContact } from '@/lib/settings';
+import { useCart } from '@/lib/cart';
 import { WhatsAppIcon } from './WhatsAppIcon';
 
 const NAV = [
@@ -15,6 +16,7 @@ const NAV = [
 
 export function Header() {
   const c = useContact();
+  const { count, openCart } = useCart();
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -93,6 +95,19 @@ export function Header() {
         </nav>
 
         <div className="header-controls">
+          <button
+            type="button"
+            className="nch-cart-btn"
+            aria-label={`Open cart${count > 0 ? ` (${count} item${count !== 1 ? 's' : ''})` : ''}`}
+            onClick={openCart}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="9" cy="20" r="1.4"/>
+              <circle cx="18" cy="20" r="1.4"/>
+              <path d="M2 3h3l2.7 12.4a1 1 0 001 .8h8.9a1 1 0 001-.8L20 7H6"/>
+            </svg>
+            {count > 0 && <span className="nch-cart-count">{count}</span>}
+          </button>
           <a
             href={c.wa(enquiry)}
             className="header-whatsapp-btn"
