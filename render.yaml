@@ -81,3 +81,9 @@ services:
 
       - key: PUBLIC_WRITE_RATE_LIMIT_MAX
         value: "15"
+
+      - key: RAZORPAY_KEY_ID
+        value: "rzp_test_U27lrlqPpZRE65"
+
+      - key: RAZORPAY_KEY_SECRET
+        sync: false   # Set this in Render dashboard — never commit the secret

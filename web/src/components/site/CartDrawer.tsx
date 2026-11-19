@@ -208,17 +208,54 @@ function CustomerCheckout({ onClose }: { onClose: () => void }) {
     setLoading('online');
     const API = import.meta.env.VITE_API_URL ?? '/api/v1';
     try {
+      // Step 1 — Create Razorpay order on backend
       const r = await fetch(`${API}/orders/initiate`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload()),
       });
-      const json = await r.json() as { data?: { billNumber?: string; totalAmount?: number; orderToken?: string } };
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({})) as { message?: string };
+        alert(err.message ?? 'Could not initialize payment. Please try again.');
+        setLoading(null);
+        return;
+      }
+      const json = await r.json() as {
+        data?: {
+          billNumber?: string;
+          totalAmount?: number;
+          orderToken?: string;
+          razorpayKeyId?: string | null;
+          razorpayOrderId?: string | null;
+          amount?: number;
+          currency?: string;
+          mode?: string;
+        }
+      };
       const d = json.data ?? {};
       setLoading(null);
-      openOnlineModal(d.billNumber ?? '', d.totalAmount ?? total, d.orderToken ?? null, finalize, setBill);
+
+      // Step 2 — If Razorpay is configured, open checkout modal
+      if (d.mode === 'razorpay' && d.razorpayKeyId && d.razorpayOrderId) {
+        openRazorpayModal({
+          keyId: d.razorpayKeyId,
+          orderId: d.razorpayOrderId,
+          amountPaise: d.amount ?? Math.round((d.totalAmount ?? total) * 100),
+          currency: d.currency ?? 'INR',
+          billNumber: d.billNumber ?? '',
+          orderToken: d.orderToken ?? null,
+          customerName: name,
+          customerPhone: phone,
+          customerEmail: email,
+          finalize,
+          setBill,
+        });
+      } else {
+        // Fallback: Razorpay not configured — open manual ref modal
+        openOnlineModal(d.billNumber ?? '', d.totalAmount ?? total, d.orderToken ?? null, finalize, setBill);
+      }
     } catch {
       setLoading(null);
-      openOnlineModal('', total, null, finalize, setBill);
+      alert('Network error. Please check your connection and try again.');
     }
   };
 
@@ -362,6 +399,76 @@ function openScannerModal(
     overlay.remove();
     setBill(bill);
   });
+}
+
+// ── Razorpay Standard Checkout ──────────────────────────────────────────────
+interface RazorpayModalArgs {
+  keyId: string;
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+  billNumber: string;
+  orderToken: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  finalize: (extra: Record<string, unknown>) => Promise<BillData>;
+  setBill: (b: BillData) => void;
+}
+
+function openRazorpayModal(args: RazorpayModalArgs) {
+  const {
+    keyId, orderId, amountPaise, currency, billNumber,
+    orderToken, customerName, customerPhone, customerEmail,
+    finalize, setBill,
+  } = args;
+
+  if (typeof window.Razorpay === 'undefined') {
+    alert('Razorpay could not be loaded. Please check your connection and try again.');
+    return;
+  }
+
+  const rzp = new window.Razorpay({
+    key: keyId,
+    amount: amountPaise,
+    currency,
+    name: 'Neha Crockery House',
+    description: `Bill ${billNumber} — Store Pickup`,
+    image: '/assets/images/logo.jpeg',
+    order_id: orderId,
+    prefill: {
+      name: customerName,
+      contact: customerPhone,
+      email: customerEmail || undefined,
+    },
+    notes: { billNumber, orderToken: orderToken ?? '' },
+    theme: { color: '#1a2744' },
+    modal: {
+      ondismiss: () => { /* user dismissed — cart stays open */ },
+    },
+    handler: (response) => {
+      void finalize({
+        orderToken,
+        paymentMethod: 'Razorpay Online',
+        razorpayOrderId: response.razorpay_order_id,
+        razorpayPaymentId: response.razorpay_payment_id,
+        razorpaySignature: response.razorpay_signature,
+      }).then((bill) => setBill(bill)).catch(() => {
+        setBill({
+          billNumber, customerName, phone: customerPhone,
+          paymentMethod: 'Razorpay Online',
+          totalAmount: amountPaise / 100,
+          dateStr: new Date().toLocaleString('en-IN'),
+        });
+      });
+    },
+  });
+
+  rzp.on('payment.failed', (resp) => {
+    alert(`Payment failed: ${resp.error.description}. Please try again.`);
+  });
+
+  rzp.open();
 }
 
 // ── Online Payment Modal ──────────────────────────────────────────────────────
