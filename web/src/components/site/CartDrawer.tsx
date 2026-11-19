@@ -310,16 +310,16 @@ function CustomerCheckout({ onClose }: { onClose: () => void }) {
         autoComplete="organization"
       />
 
-      <button className="nch-go" disabled={!!loading} onClick={() => void handleOnline()}>
+      <button className="nch-btn-online" disabled={!!loading} onClick={() => void handleOnline()}>
         {loading === 'online' ? 'Initializing Payment…' : '💳 Pay Online & Generate Bill →'}
       </button>
-      <button className="nch-scanner-btn" disabled={!!loading} onClick={() => void handleScanner()}>
+      <button className="nch-btn-scanner" disabled={!!loading} onClick={() => void handleScanner()}>
         {loading === 'scanner' ? 'Preparing QR…' : '📷 Pay by UPI Scanner / QR Code →'}
       </button>
-      <button className="nch-cash-btn" disabled={!!loading} onClick={() => void handleCash()}>
+      <button className="nch-btn-cash" disabled={!!loading} onClick={() => void handleCash()}>
         {loading === 'cash' ? 'Generating Bill…' : '💵 Pay by Cash (at Store Pickup) →'}
       </button>
-      <p className="nch-note">
+      <p style={{ fontSize: 11, color: '#888', margin: '4px 0 0', textAlign: 'center' }}>
         Scan QR Code (GPay / PhonePe / Paytm), Pay Online (UPI / Card), or Pay Cash at Pickup. Instant bill generated.
       </p>
     </div>
