@@ -98,7 +98,12 @@ app.use(
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: resolveClientIp,
-    message: { success: false, message: 'Too many requests. Please slow down.' },
+    // Explicit handler ensures Content-Type: application/json is always set.
+    // Without this, some versions of express-rate-limit send plain-text
+    // "Too Many Requests" which causes JSON.parse errors on the frontend.
+    handler: (_req, res) => {
+      res.status(429).json({ success: false, message: 'Too many requests. Please slow down.' });
+    },
   }),
 );
 

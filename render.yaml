@@ -1,5 +1,5 @@
-# =============================================================================
-# Neha Crockery House — Render Blueprint
+﻿# =============================================================================
+# Neha Crockery House â€” Render Blueprint
 # Docs: https://render.com/docs/blueprint-spec
 # =============================================================================
 
@@ -10,17 +10,17 @@ services:
     region: singapore          # closest to India (ap-south-1)
     plan: free                 # change to "starter" ($7/mo) for always-on
 
-    # ── Source ───────────────────────────────────────────────────────────────
+    # â”€â”€ Source â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     rootDir: backend           # Render will cd into backend/ before building
 
-    # ── Build & Start ─────────────────────────────────────────────────────────
+    # â”€â”€ Build & Start â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     buildCommand: npm ci && npm run build:render
     startCommand: npm run start:prod
 
-    # ── Health Check ──────────────────────────────────────────────────────────
+    # â”€â”€ Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     healthCheckPath: /api/v1/health
 
-    # ── Environment Variables ─────────────────────────────────────────────────
+    # â”€â”€ Environment Variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Set these in the Render Dashboard -> Environment tab.
     # NEVER commit real values here.
     envVars:
@@ -30,25 +30,25 @@ services:
       - key: PORT
         value: 10000            # Render always exposes port 10000 internally
 
-      # ── Database (Supabase) ────────────────────────────────────────────────
+      # â”€â”€ Database (Supabase) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - key: DATABASE_URL
         sync: false             # fill manually in Render dashboard
 
       - key: DIRECT_URL
         sync: false
 
-      # ── Reverse Proxy (Render load balancer) ───────────────────────────────
+      # â”€â”€ Reverse Proxy (Render load balancer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - key: TRUST_PROXY
         value: "1"
 
-      # ── CORS ──────────────────────────────────────────────────────────────
+      # â”€â”€ CORS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # Replace with your real Vercel domain(s) after deploying.
       # Include both custom domain AND the free .vercel.app subdomain.
       # Example: https://nehacrockery.com,https://neha-crockery.vercel.app
       - key: CORS_ORIGINS
         value: https://nehacrockery.com,https://nehacrockery.vercel.app,https://neha-crockery.vercel.app
 
-      # ── Supabase Auth ─────────────────────────────────────────────────────
+      # â”€â”€ Supabase Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - key: SUPABASE_URL
         sync: false
 
@@ -61,7 +61,7 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
 
-      # ── File Uploads ──────────────────────────────────────────────────────
+      # â”€â”€ File Uploads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       # File uploads go to Supabase Storage (persistent across deploys)
       - key: STORAGE_STRATEGY
         value: supabase
@@ -69,7 +69,7 @@ services:
       - key: UPLOAD_MAX_SIZE_MB
         value: "10"
 
-      # ── Rate Limiting ──────────────────────────────────────────────────────
+      # â”€â”€ Rate Limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       - key: RATE_LIMIT_WINDOW_MS
         value: "900000"
 
@@ -77,7 +77,7 @@ services:
         value: "100"
 
       - key: AUTH_RATE_LIMIT_MAX
-        value: "5"
+        value: "20"
 
       - key: PUBLIC_WRITE_RATE_LIMIT_MAX
         value: "15"

@@ -28,9 +28,14 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: loginRateLimitKey,
-  message: {
-    success: false,
-    message: 'Too many login attempts. Please wait 15 minutes before trying again.',
+  // Explicit handler ensures Content-Type: application/json is always set.
+  // Without this, some versions of express-rate-limit send plain-text
+  // "Too Many Requests" which causes JSON.parse errors on the frontend.
+  handler: (_req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many login attempts. Please wait 15 minutes before trying again.',
+    });
   },
 });
 
