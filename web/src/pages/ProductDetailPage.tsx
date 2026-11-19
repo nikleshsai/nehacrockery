@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Seo } from '@/components/Seo';
 import { ProductCard } from '@/components/site/ProductCard';
 import { WhatsAppIcon } from '@/components/site/WhatsAppIcon';
+import { CheckoutButton } from '@/components/site/CheckoutButton';
 import { request } from '@/lib/api';
 import { useApiData } from '@/lib/hooks';
 import { useContact } from '@/lib/settings';
@@ -32,6 +33,7 @@ const CUSTOMER_TYPES: Array<{ value: CustomerType; label: string }> = [
 export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const c = useContact();
+  const navigate = useNavigate();
 
   const { data: product, loading, error } = useApiData<Product>(
     slug ? `/products/${encodeURIComponent(slug)}` : null,
@@ -56,6 +58,7 @@ export default function ProductDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitSuccess, setSubmitSuccess] = useState(false);
+
 
   useEffect(() => {
     setActiveImgIdx(0);
@@ -490,8 +493,34 @@ export default function ProductDetailPage() {
 
                 {submitError && <div className="order-error">{submitError}</div>}
 
-                <button type="submit" className="order-submit-btn" disabled={submitting}>
-                  {submitting ? 'Submitting…' : 'Submit Order Enquiry'}
+                {/* Razorpay online payment */}
+                <CheckoutButton
+                  items={[{
+                    productId: product.id,
+                    productCode: product.productCode ?? undefined,
+                    quantity: 1,
+                  }]}
+                  customer={{
+                    customerName: name.trim() || 'Customer',
+                    phone: phone.trim(),
+                    email: email.trim() || undefined,
+                    notes: message.trim() || undefined,
+                  }}
+                  disabled={!name.trim() || !phone.trim()}
+                  label="Pay Now →"
+                  className="order-submit-btn"
+                  onSuccess={(bill) => {
+                    setSubmitSuccess(true);
+                    setModalOpen(false);
+                    navigate(`/bill/${bill.billNumber}?token=${encodeURIComponent(bill.billAccessToken)}`);
+                  }}
+                  onCancel={() => setSubmitError('')}
+                />
+
+                <div className="order-divider"><span>or</span></div>
+
+                <button type="submit" className="order-enquiry-btn" disabled={submitting}>
+                  {submitting ? 'Submitting…' : 'Send Enquiry (No Payment)'}
                 </button>
               </form>
             )}

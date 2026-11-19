@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { Product } from '@/lib/types';
+import { useCart } from '@/lib/cart';
 
 export const CATEGORY_LABELS: Record<string, string> = {
   crockery: 'Crockery & Dinnerware',
@@ -25,6 +26,21 @@ export function ProductCard({ product, cta = 'Order / Enquire' }: Props) {
   const catSlug = product.category?.slug ?? '';
   const catLabel = product.category?.name ?? CATEGORY_LABELS[catSlug] ?? catSlug.replace(/-/g, ' ');
   const meta = [product.material, product.capacity, product.setContents].filter(Boolean).join(' · ');
+  const { add, isInCart } = useCart();
+  const inCart = isInCart(product.id);
+
+  function handleAddToCart(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    add({
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      productCode: product.productCode ?? null,
+      imageUrl: product.images?.[0]?.imageUrl ?? null,
+      brandName: product.brand?.name ?? null,
+    });
+  }
 
   return (
     <article className="product-card" data-id={product.productCode ?? product.id}>
@@ -68,6 +84,19 @@ export function ProductCard({ product, cta = 'Order / Enquire' }: Props) {
         <Link to={href} className="product-enquire-btn">
           {cta}
         </Link>
+        <button
+          type="button"
+          className={`product-cart-btn${inCart ? ' in-cart' : ''}`}
+          onClick={handleAddToCart}
+          aria-label={inCart ? 'Added to cart' : 'Add to cart'}
+          title={inCart ? 'Already in cart' : 'Add to enquiry cart'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="9" cy="21" r="1" />
+            <circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+          </svg>
+        </button>
       </div>
     </article>
   );

@@ -5,6 +5,8 @@ import { Header } from './Header';
 import { Footer } from './Footer';
 import { WelcomePopup } from './WelcomePopup';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { CartDrawer } from './CartDrawer';
+import { CartProvider } from '@/lib/cart';
 import { useEffect } from 'react';
 
 /** Public site chrome: header, footer, floating WhatsApp button, route effects. */
@@ -18,8 +20,9 @@ export function SiteLayout() {
   }, [pathname]);
 
   return (
-    <>
+    <CartProvider>
       {pathname === '/' && <WelcomePopup />}
+      <CartDrawer />
       <Header />
       <main id="main-content">
         <Outlet />
@@ -35,6 +38,6 @@ export function SiteLayout() {
       >
         <WhatsAppIcon size={26} />
       </a>
-    </>
+    </CartProvider>
   );
 }

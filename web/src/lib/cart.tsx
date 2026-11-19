@@ -1,32 +1,27 @@
 /**
- * Cart context — localStorage-backed, no server required.
- * Wholesale enquiry cart: items are name + slug only (no price).
+ * CartProvider + useCart — simple enquiry-based cart (no prices).
+ * Items are persisted to localStorage so the cart survives page refreshes.
  */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+
+// ── Types ───────────────────────────────────────────────────────────────────
 
 export interface CartItem {
-  id: string;        // product id
-  slug: string;
-  name: string;
-  image?: string;
-  brand?: string;
-  productCode?: string;
-  qty: number;       // enquiry quantity (default 1)
+  id: string;          // product.id
+  slug: string;        // product.slug — used for navigation
+  name: string;        // display name
+  productCode?: string | null;
+  imageUrl?: string | null;
+  brandName?: string | null;
+  quantity: number;
 }
 
-interface CartCtx {
+interface CartContextValue {
   items: CartItem[];
-  count: number;
-  add: (item: Omit<CartItem, 'qty'>) => void;
+  count: number;         // total quantity across all items
+  add: (item: Omit<CartItem, 'quantity'>, qty?: number) => void;
   remove: (id: string) => void;
-  updateQty: (id: string, qty: number) => void;
+  setQty: (id: string, qty: number) => void;
   clear: () => void;
   isInCart: (id: string) => boolean;
   drawerOpen: boolean;
@@ -34,39 +29,45 @@ interface CartCtx {
   closeDrawer: () => void;
 }
 
-const Ctx = createContext<CartCtx | null>(null);
+// ── Storage ─────────────────────────────────────────────────────────────────
 
-const KEY = 'nch_cart_v1';
+const STORAGE_KEY = 'nch_cart_v1';
 
-function load(): CartItem[] {
+function loadCart(): CartItem[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as CartItem[]) : [];
   } catch {
     return [];
   }
 }
 
-function save(items: CartItem[]) {
+function saveCart(items: CartItem[]) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  } catch {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore storage errors
+  }
 }
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(load);
+// ── Context ──────────────────────────────────────────────────────────────────
+
+const CartContext = createContext<CartContextValue | null>(null);
+
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>(loadCart);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Persist on every change
-  useEffect(() => save(items), [items]);
+  useEffect(() => { saveCart(items); }, [items]);
 
-  const add = useCallback((item: Omit<CartItem, 'qty'>) => {
+  const add = useCallback((product: Omit<CartItem, 'quantity'>, qty = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const existing = prev.find((i) => i.id === product.id);
       if (existing) {
-        return prev.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
+        return prev.map((i) => i.id === product.id ? { ...i, quantity: i.quantity + qty } : i);
       }
-      return [...prev, { ...item, qty: 1 }];
+      return [...prev, { ...product, quantity: qty }];
     });
     setDrawerOpen(true);
   }, []);
@@ -75,9 +76,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const updateQty = useCallback((id: string, qty: number) => {
-    if (qty < 1) return;
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i)));
+  const setQty = useCallback((id: string, qty: number) => {
+    if (qty <= 0) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } else {
+      setItems((prev) => prev.map((i) => i.id === id ? { ...i, quantity: qty } : i));
+    }
   }, []);
 
   const clear = useCallback(() => setItems([]), []);
@@ -85,18 +89,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
+  const count = items.reduce((sum, i) => sum + i.quantity, 0);
 
-  const value = useMemo(
-    () => ({ items, count, add, remove, updateQty, clear, isInCart, drawerOpen, openDrawer, closeDrawer }),
-    [items, count, add, remove, updateQty, clear, isInCart, drawerOpen, openDrawer, closeDrawer],
+  return (
+    <CartContext.Provider value={{ items, count, add, remove, setQty, clear, isInCart, drawerOpen, openDrawer, closeDrawer }}>
+      {children}
+    </CartContext.Provider>
   );
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useCart(): CartCtx {
-  const ctx = useContext(Ctx);
+export function useCart(): CartContextValue {
+  const ctx = useContext(CartContext);
   if (!ctx) throw new Error('useCart must be used inside <CartProvider>');
   return ctx;
 }
+

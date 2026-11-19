@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useContact } from '@/lib/settings';
-import { useCart } from '@/lib/cart';
 import { WhatsAppIcon } from './WhatsAppIcon';
+import { useCart } from '@/lib/cart';
 
 const NAV = [
   { to: '/', label: 'Home', id: 'home', end: true },
@@ -16,11 +16,11 @@ const NAV = [
 
 export function Header() {
   const c = useContact();
-  const { count, openDrawer } = useCart();
   const { pathname } = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const { count, openDrawer } = useCart();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -95,6 +95,21 @@ export function Header() {
         </nav>
 
         <div className="header-controls">
+          {/* Cart icon */}
+          <button
+            type="button"
+            className="header-cart-btn"
+            onClick={openDrawer}
+            aria-label={`Open cart (${count} item${count !== 1 ? 's' : ''})`}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            {count > 0 && <span className="cart-badge">{count}</span>}
+          </button>
+
           <a
             href={c.wa(enquiry)}
             className="header-whatsapp-btn"
