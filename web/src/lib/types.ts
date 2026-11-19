@@ -206,7 +206,6 @@ export interface SiteSettings {
   linkedin?: string | null;
   gstNumber?: string | null;
   panNumber?: string | null;
-  upiId?: string | null;
 }
 
 export interface AuditLog {

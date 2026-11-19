@@ -365,7 +365,6 @@ model SiteSettings {
   linkedin         String?
   gstNumber        String?  @map("gst_number")
   panNumber        String?  @map("pan_number")
-  upiId            String?  @map("upi_id")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 

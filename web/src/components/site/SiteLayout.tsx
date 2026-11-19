@@ -5,7 +5,6 @@ import { Header } from './Header';
 import { Footer } from './Footer';
 import { WelcomePopup } from './WelcomePopup';
 import { WhatsAppIcon } from './WhatsAppIcon';
-import { CartDrawer } from './CartDrawer';
 import { useEffect } from 'react';
 
 /** Public site chrome: header, footer, floating WhatsApp button, route effects. */
@@ -22,7 +21,6 @@ export function SiteLayout() {
     <>
       {pathname === '/' && <WelcomePopup />}
       <Header />
-      <CartDrawer />
       <main id="main-content">
         <Outlet />
       </main>

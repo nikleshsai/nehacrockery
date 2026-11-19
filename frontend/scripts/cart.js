@@ -12,10 +12,6 @@
   var DEFAULT_PHONE = '+91 97102 54681';
   var DEFAULT_ADDRESS = '13/3, Memorial Hall Road, Rattan Bazaar, Park Town, Chennai, Tamil Nadu 600003';
   var DEFAULT_BUSINESS = 'Neha Crockery House';
-  // ⚠️  Replace with your actual UPI ID (PhonePe / GPay / Paytm / bank UPI)
-  // Format: yourname@okaxis  or  yourname@ybl  or  phone@paytm etc.
-  // This is also configurable from Admin → Settings → UPI ID field.
-  var DEFAULT_UPI_ID = 'nehacrockeryhouse@okaxis';
 
   function getWaNumber() {
     var s = window.__NCH_SITE_SETTINGS__;
@@ -37,11 +33,6 @@
   function getBusinessPhone() {
     var s = window.__NCH_SITE_SETTINGS__;
     return (s && s.phone) || (document.body && document.body.dataset.phoneDisplay) || DEFAULT_PHONE;
-  }
-
-  function getUpiId() {
-    var s = window.__NCH_SITE_SETTINGS__;
-    return (s && s.upiId) || DEFAULT_UPI_ID;
   }
 
   function load() {
@@ -135,8 +126,6 @@
     '.nch-go:hover{background:#263861}.nch-go[disabled]{opacity:.6;cursor:not-allowed}' +
     '.nch-cash-btn{width:100%;margin-top:8px;padding:11px 12px;border:1.5px solid #c8a84b;border-radius:6px;background:#fff9eb;color:#1a2744;font:600 13px Montserrat,sans-serif;cursor:pointer;transition:all .2s}' +
     '.nch-cash-btn:hover{background:#c8a84b;color:#fff}.nch-cash-btn[disabled]{opacity:.6;cursor:not-allowed}' +
-    '.nch-scanner-btn{width:100%;margin-top:8px;padding:11px 12px;border:1.5px solid #2563eb;border-radius:6px;background:#eff6ff;color:#1e3a8a;font:600 13px Montserrat,sans-serif;cursor:pointer;transition:all .2s}' +
-    '.nch-scanner-btn:hover{background:#2563eb;color:#fff}.nch-scanner-btn[disabled]{opacity:.6;cursor:not-allowed}' +
     '.nch-note{font-size:11px;color:#666;margin:8px 0 0;text-align:center}' +
     '.nch-empty{text-align:center;color:#777;padding:40px 0;font-size:14px}' +
     '.nch-pay-modal{position:fixed;inset:0;background:rgba(13,34,64,.72);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;font-family:Montserrat,sans-serif}' +
@@ -221,10 +210,9 @@
       '<input id="nch-email" placeholder="Email Address (optional)" type="email" autocomplete="email">' +
       '<input id="nch-company" placeholder="Business / Shop Name (optional)" autocomplete="organization">' +
       '<button class="nch-go" id="nch-go">\ud83d\udcb3 Pay Online &amp; Generate Bill \u2192</button>' +
-      '<button class="nch-go" id="nch-go">💳 Pay Online &amp; Generate Bill →</button>' +
-      '<button class="nch-scanner-btn" id="nch-scanner-go">📷 Pay by UPI Scanner / QR Code →</button>' +
-      '<button class="nch-cash-btn" id="nch-cash-go">💵 Pay by Cash (at Store Pickup) →</button>' +
-      '<p class="nch-note">Scan QR Code with any UPI app (GPay / PhonePe / Paytm), Pay Online (UPI / Card / NetBanking), or Pay by Cash at Showroom Pickup. Instant unique Bill generated.</p>';
+      '<button class="nch-cash-btn" id="nch-cash-go">\ud83d\udcb5 Pay by Cash (at Store Pickup) \u2192</button>' +
+      '<p class="nch-note">Pay Online (UPI / Card / NetBanking) or Pay by Cash at Showroom Pickup. Instant unique Bill generated.</p>';
+  }
 
   window.addEventListener('nch:settings-updated', function () {
     var addrEl = document.getElementById('nch-pickup-addr-text');
@@ -441,106 +429,6 @@
       });
   }
 
-
-  // ── UPI SCANNER / QR CODE PAYMENT MODAL ─────────────────────────────────────
-  function openUpiScannerModal(initData, customer, items) {
-    var upiId = getUpiId();
-    var amount = initData.totalAmount;
-    var billNo = initData.billNumber;
-    var bizName = getBusinessName();
-
-    // Build UPI deep-link (works with GPay, PhonePe, Paytm, any UPI app)
-    var upiLink = 'upi://pay?pa=' + encodeURIComponent(upiId) +
-      '&pn=' + encodeURIComponent(bizName) +
-      '&am=' + encodeURIComponent(amount.toFixed(2)) +
-      '&cu=INR' +
-      '&tn=' + encodeURIComponent('Bill ' + billNo + ' - ' + bizName);
-
-    // QR code image via Google Charts (no external library needed)
-    var qrUrl = 'https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=' + encodeURIComponent(upiLink) + '&choe=UTF-8';
-
-    var modal = document.createElement('div');
-    modal.className = 'nch-pay-modal';
-    modal.innerHTML =
-      '<div class="nch-pay-card" role="dialog" aria-modal="true" aria-label="UPI Scanner Payment" style="max-width:380px;">' +
-      '<div class="nch-pay-hdr" style="background:#1e3a8a;">' +
-      '<div>' +
-      '<div style="font-size:11px;opacity:.85;">📷 Scan & Pay — ' + esc(bizName) + '</div>' +
-      '<div style="font-size:15px;font-weight:700;">Bill No: ' + esc(billNo) + '</div>' +
-      '</div>' +
-      '<button type="button" id="nch-scan-close" style="background:none;border:0;color:#fff;font-size:24px;cursor:pointer;">&times;</button>' +
-      '</div>' +
-      '<div class="nch-pay-bdy">' +
-      // Amount banner
-      '<div style="display:flex;justify-content:space-between;align-items:center;background:#eff6ff;border:1.5px solid #bfdbfe;padding:10px 14px;border-radius:8px;margin-bottom:14px;">' +
-      '<div><div style="font-size:11px;color:#1e40af;font-weight:600;">AMOUNT TO PAY</div><strong style="font-size:20px;color:#1e3a8a;">' + inr(amount) + '</strong></div>' +
-      '<div style="text-align:right;font-size:12px;color:#555;">UPI ID:<br><strong style="font-size:13px;color:#1e3a8a;">' + esc(upiId) + '</strong></div>' +
-      '</div>' +
-      // QR Code
-      '<div style="text-align:center;margin-bottom:12px;">' +
-      '<p style="font-size:12px;color:#555;margin:0 0 8px;">Scan with <strong>GPay / PhonePe / Paytm</strong> or any UPI app</p>' +
-      '<div style="display:inline-block;padding:8px;border:2px solid #bfdbfe;border-radius:10px;background:#fff;">' +
-      '<img src="' + qrUrl + '" alt="UPI QR Code" width="200" height="200" style="display:block;" loading="eager">' +
-      '</div>' +
-      '<p style="font-size:11px;color:#1e40af;margin:6px 0 0;font-weight:600;">OR tap to open in your UPI app:</p>' +
-      '<a href="' + esc(upiLink) + '" style="display:inline-block;margin-top:6px;padding:8px 18px;background:#2563eb;color:#fff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;">Open UPI App 📱</a>' +
-      '</div>' +
-      // Instructions
-      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:10px 12px;font-size:12px;color:#166534;margin-bottom:12px;">' +
-      '<strong>Steps:</strong><ol style="margin:4px 0 0 16px;padding:0;">' +
-      '<li>Scan the QR code or tap "Open UPI App"</li>' +
-      '<li>Pay exactly <strong>' + inr(amount) + '</strong></li>' +
-      '<li>Note the <strong>UTR / Transaction ID</strong> shown after payment</li>' +
-      '<li>Enter it below and click Confirm</li>' +
-      '</ol></div>' +
-      // UTR input
-      '<label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">Enter UPI Transaction ID / UTR No. <span style="color:#b91c1c;">*</span></label>' +
-      '<input id="nch-utr-input" placeholder="e.g. 423898765432 (12-digit UTR)" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #bfdbfe;border-radius:6px;font:13px Montserrat,sans-serif;margin-bottom:8px;">' +
-      '<p id="nch-scan-err" style="color:#b91c1c;font-size:12px;margin:0 0 8px;display:none;"></p>' +
-      '<button type="button" id="nch-scan-confirm" class="nch-go" style="background:#2563eb;">✅ Payment Done — Generate Bill →</button>' +
-      '</div>' +
-      '</div>';
-
-    document.body.appendChild(modal);
-
-    modal.querySelector('#nch-scan-close').addEventListener('click', function () {
-      modal.remove();
-    });
-
-    modal.querySelector('#nch-scan-confirm').addEventListener('click', function () {
-      var utrInput = modal.querySelector('#nch-utr-input');
-      var utr = utrInput ? utrInput.value.trim() : '';
-      var errEl = modal.querySelector('#nch-scan-err');
-
-      if (!utr || utr.length < 6) {
-        errEl.textContent = 'Please enter a valid UPI Transaction ID / UTR number.';
-        errEl.style.display = 'block';
-        return;
-      }
-      errEl.style.display = 'none';
-
-      var confirmBtn = modal.querySelector('#nch-scan-confirm');
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Verifying & Generating Bill…';
-
-      finalizeOrderOnBackend({
-        orderToken: initData.orderToken || null,
-        billNumber: billNo,
-        customerName: customer.customerName,
-        companyName: customer.companyName,
-        phone: customer.phone,
-        email: customer.email,
-        items: items,
-        paymentMethod: 'UPI Scanner / QR (UTR: ' + utr + ')',
-        transactionRef: utr,
-        upiId: upiId
-      }, function (bill) {
-        modal.remove();
-        showGeneratedBillInDrawer(bill);
-      });
-    });
-  }
-
   function openOnlineGatewayModal(initData, customer, items, onCancel) {
     var modal = document.createElement('div');
     modal.className = 'nch-pay-modal';
@@ -665,45 +553,6 @@
       });
       return;
     }
-    // ── UPI SCANNER / QR payment
-    if (e.target.id === 'nch-scanner-go') {
-      var scanBtn = e.target;
-      scanBtn.disabled = true;
-      scanBtn.textContent = 'Preparing QR Code\u2026';
-      var scanItems = cart.map(function (c) {
-        return { slug: c.slug || null, productName: c.name, productCode: c.code || null, quantity: c.qty, unitPrice: Number(c.price) || 0 };
-      });
-      fetch(API + '/orders/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName: name, companyName: company || null, phone: phone, email: email || null, items: scanItems })
-      })
-        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-        .then(function (resp) {
-          var d = (resp && resp.data) || resp || {};
-          scanBtn.disabled = false;
-          scanBtn.textContent = '\ud83d\udcf7 Pay by UPI Scanner / QR Code \u2192';
-          openUpiScannerModal(
-            { billNumber: d.billNumber || d.orderToken || ('NCH-' + Date.now().toString(36).toUpperCase()), totalAmount: d.totalAmount || scanItems.reduce(function(s,i){return s+i.quantity*i.unitPrice;},0), orderToken: d.orderToken || null },
-            { customerName: name, companyName: company || null, phone: phone, email: email || null },
-            scanItems
-          );
-        })
-        .catch(function () {
-          // Fallback: open QR directly with cart total
-          scanBtn.disabled = false;
-          scanBtn.textContent = '\ud83d\udcf7 Pay by UPI Scanner / QR Code \u2192';
-          var fallbackTotal = cart.reduce(function(a,i){return a+(i.price?i.price*i.qty:0);},0);
-          var fallbackBill = 'NCH-' + Date.now().toString(36).toUpperCase();
-          openUpiScannerModal(
-            { billNumber: fallbackBill, totalAmount: fallbackTotal, orderToken: null },
-            { customerName: name, companyName: company || null, phone: phone, email: email || null },
-            scanItems
-          );
-        });
-      return;
-    }
-
 
     var goBtn = e.target;
     goBtn.disabled = true;

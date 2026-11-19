@@ -1,6 +1,7 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Cart Context — persisted in localStorage, shared across the React app
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Cart context — localStorage-backed, no server required.
+ * Wholesale enquiry cart: items are name + slug only (no price).
+ */
 import {
   createContext,
   useCallback,
@@ -8,40 +9,38 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ReactNode,
 } from 'react';
-import type { Product } from './types';
-
-const STORAGE_KEY = 'nch_cart';
 
 export interface CartItem {
+  id: string;        // product id
   slug: string;
   name: string;
-  code?: string | null;   // productCode from the backend
-  price: number | null;   // null = "price on request"
-  img?: string | null;
-  qty: number;
+  image?: string;
+  brand?: string;
+  productCode?: string;
+  qty: number;       // enquiry quantity (default 1)
 }
 
-interface CartContextValue {
+interface CartCtx {
   items: CartItem[];
   count: number;
-  total: number;
-  hasUnpriced: boolean;
-  isOpen: boolean;
-  openCart: () => void;
-  closeCart: () => void;
-  addItem: (p: Product) => void;
-  setQty: (slug: string, qty: number) => void;
-  removeItem: (slug: string) => void;
-  clearCart: () => void;
+  add: (item: Omit<CartItem, 'qty'>) => void;
+  remove: (id: string) => void;
+  updateQty: (id: string, qty: number) => void;
+  clear: () => void;
+  isInCart: (id: string) => boolean;
+  drawerOpen: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
 }
 
-const CartCtx = createContext<CartContextValue | null>(null);
+const Ctx = createContext<CartCtx | null>(null);
+
+const KEY = 'nch_cart_v1';
 
 function load(): CartItem[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(KEY);
     return raw ? (JSON.parse(raw) as CartItem[]) : [];
   } catch {
     return [];
@@ -49,81 +48,55 @@ function load(): CartItem[] {
 }
 
 function save(items: CartItem[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+  } catch {}
 }
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(load);
-  const [isOpen, setIsOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Persist on every change
-  useEffect(() => { save(items); }, [items]);
+  useEffect(() => save(items), [items]);
 
-  // Close on Escape key
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
-  const openCart = useCallback(() => setIsOpen(true), []);
-  const closeCart = useCallback(() => setIsOpen(false), []);
-
-  const addItem = useCallback((p: Product) => {
+  const add = useCallback((item: Omit<CartItem, 'qty'>) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.slug === p.slug);
+      const existing = prev.find((i) => i.id === item.id);
       if (existing) {
-        return prev.map((i) => i.slug === p.slug ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
       }
-      return [
-        ...prev,
-        {
-          slug: p.slug,
-          name: p.name,
-          code: p.productCode ?? null,
-          price: typeof p.mrp === 'number' ? p.mrp : null,
-          img: Array.isArray(p.images) && p.images.length > 0 ? p.images[0]?.imageUrl ?? null : null,
-          qty: 1,
-        },
-      ];
+      return [...prev, { ...item, qty: 1 }];
     });
-    setIsOpen(true);
+    setDrawerOpen(true);
   }, []);
 
-  const setQty = useCallback((slug: string, qty: number) => {
-    setItems((prev) =>
-      qty <= 0 ? prev.filter((i) => i.slug !== slug) : prev.map((i) => i.slug === slug ? { ...i, qty } : i)
-    );
+  const remove = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
-  const removeItem = useCallback((slug: string) => {
-    setItems((prev) => prev.filter((i) => i.slug !== slug));
+  const updateQty = useCallback((id: string, qty: number) => {
+    if (qty < 1) return;
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty } : i)));
   }, []);
 
-  const clearCart = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => setItems([]), []);
+  const isInCart = useCallback((id: string) => items.some((i) => i.id === id), [items]);
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const count = useMemo(() => items.reduce((a, i) => a + i.qty, 0), [items]);
-  const total = useMemo(() => items.reduce((a, i) => a + (i.price ?? 0) * i.qty, 0), [items]);
-  const hasUnpriced = useMemo(() => items.some((i) => i.price === null), [items]);
+  const count = useMemo(() => items.reduce((s, i) => s + i.qty, 0), [items]);
 
-  const value = useMemo<CartContextValue>(
-    () => ({ items, count, total, hasUnpriced, isOpen, openCart, closeCart, addItem, setQty, removeItem, clearCart }),
-    [items, count, total, hasUnpriced, isOpen, openCart, closeCart, addItem, setQty, removeItem, clearCart]
+  const value = useMemo(
+    () => ({ items, count, add, remove, updateQty, clear, isInCart, drawerOpen, openDrawer, closeDrawer }),
+    [items, count, add, remove, updateQty, clear, isInCart, drawerOpen, openDrawer, closeDrawer],
   );
 
-  return <CartCtx.Provider value={value}>{children}</CartCtx.Provider>;
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useCart(): CartContextValue {
-  const ctx = useContext(CartCtx);
+export function useCart(): CartCtx {
+  const ctx = useContext(Ctx);
   if (!ctx) throw new Error('useCart must be used inside <CartProvider>');
   return ctx;
-}
-
-/** Convenience hook — returns addItem + whether item is already in cart */
-export function useAddToCart(product: Product) {
-  const { addItem, items } = useCart();
-  const inCart = items.some((i) => i.slug === product.slug);
-  const add = useCallback(() => addItem(product), [addItem, product]);
-  return { add, inCart };
 }
