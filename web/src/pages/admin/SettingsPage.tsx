@@ -20,6 +20,7 @@ const FIELDS: Array<[keyof SiteSettings, string, boolean?]> = [
   ['linkedin', 'LinkedIn URL'],
   ['gstNumber', 'GST number'],
   ['panNumber', 'PAN number'],
+  ['upiId', 'UPI ID (for QR Scanner payments, e.g. name@okaxis)'],
 ];
 
 export default function SettingsPage() {

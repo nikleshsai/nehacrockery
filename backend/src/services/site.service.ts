@@ -140,6 +140,7 @@ const siteSettingsPublicSelect = {
   youtube: true,
   linkedin: true,
   gstNumber: true,   // shown on invoices — public knowledge
+  upiId: true,       // needed by frontend to generate UPI QR code
   // panNumber intentionally excluded — sensitive personal/business tax ID
   createdAt: true,
   updatedAt: true,
@@ -175,6 +176,7 @@ export async function upsertSiteSettings(data: Partial<{
   linkedin: string | null;
   gstNumber: string | null;
   panNumber: string | null;
+  upiId: string | null;
 }>) {
   // M3: Whitelist allowed settings columns to prevent mass assignment
   const cleanData = {
@@ -194,6 +196,7 @@ export async function upsertSiteSettings(data: Partial<{
     ...(data.linkedin !== undefined && { linkedin: data.linkedin }),
     ...(data.gstNumber !== undefined && { gstNumber: data.gstNumber }),
     ...(data.panNumber !== undefined && { panNumber: data.panNumber }),
+    ...(data.upiId !== undefined && { upiId: data.upiId }),
   };
 
   const existing = await prisma.siteSettings.findFirst({ orderBy: { createdAt: 'asc' } });
