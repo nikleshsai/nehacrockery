@@ -37,7 +37,7 @@ export const config = {
   cors: {
     origins: (
       process.env.CORS_ORIGINS ??
-      'http://localhost:3000,http://localhost:5173,https://nehacrockery.vercel.app,https://neha-crockery.vercel.app,https://nehacrockery.com'
+      'http://localhost:3000,http://localhost:5173,https://www.nehacrockeryhouse.in,https://nehacrockeryhouse.in,https://nehacrockery.vercel.app,https://neha-crockery.vercel.app,https://nehacrockery.com'
     )
       .split(',')
       .map((o) => o.trim())
