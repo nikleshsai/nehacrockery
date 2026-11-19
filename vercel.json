@@ -1,54 +1,7 @@
 {
-  "buildCommand": "",
-  "outputDirectory": ".",
+  "buildCommand": "npm install --prefix web && npm run build --prefix web",
+  "outputDirectory": "web/dist",
   "installCommand": "",
-  "redirects": [
-    {
-      "source": "/frontend/admin",
-      "destination": "/admin",
-      "permanent": true
-    },
-    {
-      "source": "/frontend/admin/:path*",
-      "destination": "/admin/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/frontend",
-      "destination": "/",
-      "permanent": true
-    },
-    {
-      "source": "/frontend/index",
-      "destination": "/",
-      "permanent": true
-    },
-    {
-      "source": "/frontend/index.html",
-      "destination": "/",
-      "permanent": true
-    },
-    {
-      "source": "/index.html",
-      "destination": "/",
-      "permanent": true
-    },
-    {
-      "source": "/frontend/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms).html",
-      "destination": "/:page",
-      "permanent": true
-    },
-    {
-      "source": "/frontend/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms)",
-      "destination": "/:page",
-      "permanent": true
-    },
-    {
-      "source": "/:page(about|products|product|brands|taroba|catalogue|contact|privacy|terms).html",
-      "destination": "/:page",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -59,76 +12,11 @@
       "destination": "https://nehacrockery.onrender.com/uploads/:path*"
     },
     {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    },
-    {
-      "source": "/admin/:path*",
-      "destination": "/admin/:path*"
-    },
-    {
-      "source": "/",
-      "destination": "/frontend/index.html"
-    },
-    {
-      "source": "/about",
-      "destination": "/frontend/about.html"
-    },
-    {
-      "source": "/products",
-      "destination": "/frontend/products.html"
-    },
-    {
-      "source": "/product",
-      "destination": "/frontend/product.html"
-    },
-    {
-      "source": "/brands",
-      "destination": "/frontend/brands.html"
-    },
-    {
-      "source": "/taroba",
-      "destination": "/frontend/taroba.html"
-    },
-    {
-      "source": "/catalogue",
-      "destination": "/frontend/catalogue.html"
-    },
-    {
-      "source": "/contact",
-      "destination": "/frontend/contact.html"
-    },
-    {
-      "source": "/privacy",
-      "destination": "/frontend/privacy.html"
-    },
-    {
-      "source": "/terms",
-      "destination": "/frontend/terms.html"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/frontend/:path*"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [
-    {
-      "source": "/admin(.*)",
-      "headers": [
-        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), payment=(self \"https://checkout.razorpay.com\")"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
-        }
-      ]
-    },
     {
       "source": "/assets/(.*)",
       "headers": [
@@ -152,13 +40,8 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(), payment=(self \"https://checkout.razorpay.com\")"
-        },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self';"
         }
       ]
     }
   ]
 }
-
